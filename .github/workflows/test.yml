@@ -17,5 +17,21 @@ jobs:
       # need matplotlib and numpy, which smoke-figures.mjs checks in a real
       # process rather than by inspecting source.
       - run: python3 -m pip install --quiet matplotlib numpy
+      # figurelib/style.py asks for "Linux Libertine O". A runner without it
+      # gets DejaVuSans from matplotlib and smoke-figures fails on the journal
+      # font check — which is the check doing its job, not a broken build. So the
+      # font is installed here, and the step below refuses to continue if the
+      # install did not take: a missing font must not look like a failing test.
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-linuxlibertine
+          fc-cache -f
+      - run: |
+          family="$(fc-match 'Linux Libertine O' family)"
+          echo "family: $family"
+          case "$family" in
+            *Libertine*) ;;
+            *) echo "Linux Libertine O is not installed (matplotlib would fall back to DejaVu)"; exit 1 ;;
+          esac
       - run: node --version && python3 --version
       - run: npm test
