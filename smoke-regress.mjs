@@ -384,6 +384,37 @@ async function sha256(text) {
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line))
   const bashStep = steps.find((step) => step.toolName === 'bash')
+  // The pre-scan runs next to the command, so for a fast one it can finish
+  // after the write. An input hash equal to the output hash is the file as it
+  // is now; reporting it as "previous version" would claim two bytes that are
+  // the same bytes.
+  const stepsDir = join(host.workspace, '.dsh', 'provenance', 's1')
+  const forged = {
+    schemaVersion: 1,
+    id: 'step-forged',
+    sessionId: 's1',
+    runId: 'run-forged',
+    startedAt: '2026-01-01T00:00:00.000Z',
+    timestamp: '2026-01-01T00:00:01.000Z',
+    toolName: 'bash',
+    args: { command: 'printf x > x.csv' },
+    isError: false,
+    fidelity: 'observed',
+    inputs: [{ path: 'x.csv', sha256: 'a'.repeat(64), size: 2, status: 'ok' }],
+    outputs: [{ path: 'x.csv', sha256: 'a'.repeat(64), size: 2, status: 'ok' }],
+    environment: { node: process.version, python: null, cwd: host.workspace },
+  }
+  await writeFile(join(host.workspace, 'x.csv'), 'x\n')
+  await writeFile(join(stepsDir, 'steps.jsonl'), `${JSON.stringify(forged)}\n`)
+  const lineage = await host.call('provenance_of_file', { path: 'x.csv' })
+  const node = (lineage.nodes ?? []).find((entry) => entry.path === 'x.csv')
+  check(
+    'M9',
+    'a post-write pre-scan is not reported as the previous version',
+    node !== undefined && node.previousSha256 === null,
+    `previousSha256=${String(node?.previousSha256).slice(0, 12)}`,
+  )
+
   check(
     'M9',
     'the first bash step records the file it created',

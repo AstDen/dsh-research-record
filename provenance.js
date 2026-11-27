@@ -303,11 +303,15 @@ async function walkLineage(workspace, target, { maxHops, maxNodes }) {
       isError: step.isError === true,
       outputSha256: (step.outputs ?? []).find((edge) => edge?.path === current.path)?.sha256 ?? null,
     }
+    const outputSha = (step.outputs ?? []).find((edge) => edge?.path === current.path)?.sha256 ?? null
     for (const input of step.inputs ?? []) {
       if (typeof input?.path !== 'string') continue
-      // A previous version of the same path is history, not a parent node.
+      // A previous version of the same path is history, not a parent node. The
+      // pre-scan of a bash step runs next to the command, so for a fast command
+      // it can finish after the write: an input hash equal to the output hash is
+      // the file as it is now, not the version that went in.
       if (input.path === current.path) {
-        node.previousSha256 = input.sha256 ?? null
+        node.previousSha256 = input.sha256 === outputSha ? null : (input.sha256 ?? null)
         continue
       }
       node.inputs.push({ path: input.path, sha256: input.sha256 ?? null, size: input.size ?? null, known: input.sha256 !== null && input.sha256 !== undefined })

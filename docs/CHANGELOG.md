@@ -139,6 +139,10 @@ session project instead of the home directory, `notebook` writes to
 - `figure_spec` puts a single panel on the 90 mm column by default (it was
   returning a 190 mm sheet with the legend outside, contradicting the documented
   contract) and keeps the legend inside the panel.
+- `provenance_of_file` no longer calls the file it just wrote a "previous version":
+  a pre-scan that runs next to a fast `bash` command can hash the file after the
+  write, and an input hash equal to the output hash means two versions with the
+  same bytes. Such an edge is reported without a previous hash.
 - `__pycache__/`, `.dsh/` and `.tmp/` are gitignored.
 
 ## 0.8.1 — the record lands in the project, or not at all
