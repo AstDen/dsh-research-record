@@ -92,10 +92,18 @@ confirmation. Every denial is appended to `.dsh/guard/blocked.jsonl`, and
 
 The bash classifier reads the verb (`rm`, `mv`, `cp`, `dd`, …) and treats its
 non-flag arguments as write targets; an interpreter such as `python3` counts as
-a writer only when given `-i`, so reading a raw file is allowed. It is still a
-token scan, not a shell grammar: a command whose *text* mentions a protected path
-can be refused as a write. That is deliberate — a false denial costs one retried
-command, a false allow silently rewrites raw data.
+a writer only when given `-i`, so reading a raw file is allowed. It follows a
+`cd` in the same command, so `cd data && rm raw.csv` is checked where it lands
+(`data/raw.csv`), and — with `destructiveConfirm`, the default — it asks before a script
+arrives through a heredoc (`python3 - <<'PY' … PY`), because that body is data
+to a token scanner — a
+heredoc into a file (`cat > derived/notes.md <<'EOF'`) is checked by its
+destination instead. It is still a token scan, not a shell grammar: a path built
+from a variable, a subshell, a second script or an interpreter's own code can
+slip through, and a command whose *text* mentions a protected path can be
+refused as a write. That is deliberate — a false denial costs one retried
+command, a false allow silently rewrites raw data, and the real boundary is the
+filesystem's own permissions.
 
 ### Starting a project
 
@@ -211,7 +219,9 @@ prints the exact command; it installs only with `confirm: true`.
 - The journal is per session; a project timeline is the union of session files.
   `notebook_search scope=project` reads them all, but nothing merges them into one
   narrative yet.
-- The guard is a token scan, not a shell parser (see above).
+- The guard is a token scan, not a shell parser: it follows `cd` and asks about
+  interpreter heredocs, but a path built from a variable, a subshell or a second
+  script can still slip through (see above).
 - `restructure` never moves anything itself, by design.
 - Adoption is bounded: when the walk hits `max_files`, the map says so and the
   plan calls itself preliminary.

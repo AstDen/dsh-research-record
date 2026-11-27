@@ -29,7 +29,7 @@
  */
 
 import { appendFile, mkdir, readFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, posix, relative, resolve } from 'node:path'
 import { getService } from './services.js'
 
 export const name = 'research-record-guard'
@@ -69,10 +69,14 @@ const WRITERS = /\b(rm|rmdir|mv|cp|mkdir|touch|truncate|chmod|chown|ln|tee|dd|sh
  * to rewrite them. `sed -n 1p data/raw.csv` is a read; `sed -i …` is not.
  */
 const IN_PLACE_TOOLS = /\b(sed|perl|ruby|python3?|node|php|awk)\b/
+/** The verb itself is not a destination: `cd data && rm raw.csv` writes one path. */
+const WRITER_WORD = /^(rm|rmdir|mv|cp|mkdir|touch|truncate|chmod|chown|ln|tee|dd|shred|install|rsync|unzip|tar|cpio|patch|cd)$/
 const IN_PLACE_FLAG = /(^|[\s;&|(])(-i|--in-place)([\s.=;|&)]|$)/
 
 /** Extensions that make an otherwise bare token a plausible path. */
 const PATHISH_EXT = /\.(csv|tsv|json|jsonl|md|txt|log|py|js|mjs|cjs|ts|sh|yaml|yml|toml|npy|npz|h5|hdf5|stl|vtk|dat|parquet|png|pdf|xlsx|zip|gz|tgz)$/i
+/** A heredoc into one of these runs a script the guard cannot see into. */
+const INTERPRETER_FEED = /(^|[\s;&|(])(python3?|node|deno|bun|perl|ruby|php|Rscript|bash|sh|zsh|dash|ksh)(\s|$)/
 
 /** Session-scoped counters, so `policy_status` can report the live session. */
 const deniedBySession = new Map()
@@ -177,6 +181,45 @@ function looksLikePath(token) {
   return PATHISH_EXT.test(token)
 }
 
+/**
+ * Split a command into list/pipeline segments, respecting quotes. Heredoc
+ * bodies are not split out here: a body is data for a scanner, and the caller
+ * that cares (bashUnverifiable) reads it separately.
+ */
+function segments(command) {
+  const parts = []
+  let current = ''
+  let quote = ''
+  for (const char of command) {
+    if (quote !== '') {
+      current += char
+      if (char === quote) quote = ''
+      continue
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char
+      current += char
+      continue
+    }
+    if (char === '\n' || char === ';' || char === '&' || char === '|') {
+      parts.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  parts.push(current)
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0)
+}
+
+/** Resolve a candidate against the directory a preceding `cd` selected. */
+function joinUnder(cwd, token) {
+  if (token.length === 0 || isAbsolute(token)) return token
+  if (cwd.length === 0) return token
+  const joined = posix.normalize(`${cwd}/${token}`)
+  return joined.startsWith('..') ? token : joined
+}
+
 /** Path-shaped tokens a bash command could write to. */
 export function bashCandidates(command) {
   const found = new Set()
@@ -184,20 +227,60 @@ export function bashCandidates(command) {
     const cleaned = String(value).replace(/^["'`]|["'`]$/g, '')
     if (cleaned.length > 0 && !/^\/dev\//.test(cleaned)) found.add(cleaned)
   }
-  // A redirect always writes, whatever the command is.
-  for (const match of command.matchAll(/>>?\s*("[^"]*"|'[^']*'|[^\s;&|]+)/g)) add(match[1])
-  const writers = WRITERS.test(command)
-  const inPlace = IN_PLACE_TOOLS.test(command) && IN_PLACE_FLAG.test(command)
-  if (writers || inPlace) {
-    for (const token of tokens(command)) {
+  // `cd` moves the base that a later relative write resolves against: in
+  // `cd data && rm raw.csv` the write is data/raw.csv, not ./raw.csv. A
+  // subshell, a variable or a `cd` back out of the workspace is still beyond a
+  // token scanner; when the base leaves, this stops guessing and keeps the old
+  // workspace-relative reading rather than inventing a path.
+  let cwd = ''
+  for (const segment of segments(command)) {
+    const words = tokens(segment)
+    if (words[0] === 'cd') {
+      const target = words.slice(1).find((word) => !word.startsWith('-'))
+      if (target === undefined) continue
+      const cleaned = target.replace(/^["'`]|["'`]$/g, '')
+      cwd = isAbsolute(cleaned) ? posix.normalize(cleaned) : posix.normalize(cwd.length === 0 ? cleaned : `${cwd}/${cleaned}`)
+      if (cwd === '.' || cwd === '..' || cwd.startsWith('../')) cwd = ''
+      continue
+    }
+    // A redirect always writes, whatever the command is.
+    for (const match of segment.matchAll(/>>?\s*("[^"]*"|'[^']*'|[^\s;&|]+)/g)) add(joinUnder(cwd, match[1]))
+    const writers = WRITERS.test(segment)
+    const inPlace = IN_PLACE_TOOLS.test(segment) && IN_PLACE_FLAG.test(segment)
+    if (!writers && !inPlace) continue
+    for (const token of words) {
       // For a writer every non-flag argument is a destination, including a bare
-      // name like `user_data`. For an in-place editor the same holds.
+      // name like `user_data`. The verb and `cd` are not paths, though: adding
+      // them would report `data/rm` where the write is `data/raw.csv`.
+      if (WRITER_WORD.test(token)) continue
       if (token.startsWith('-')) continue
       if (/^[0-9]+$/.test(token)) continue
-      if (looksLikePath(token) || writers) add(token)
+      if (looksLikePath(token) || writers) add(joinUnder(cwd, token))
     }
   }
   return [...found]
+}
+
+/**
+ * The unverifiable part of a command: a script handed to an interpreter through
+ * a heredoc (`python3 - <<'PY' … PY`). A line scanner sees the body as words, so
+ * whatever that script writes is invisible to it — the guard asks instead of
+ * guessing. A heredoc into `cat`/`tee` is not this case: its destination is
+ * already checked like any other redirect.
+ */
+export function bashUnverifiable(command) {
+  for (const match of command.matchAll(/<<-?\s*("[^"]*"|'[^']*'|[A-Za-z_][A-Za-z0-9_]*)/g)) {
+    const delimiter = match[1].replace(/^["'`]|["'`]$/g, '')
+    const lines = command.slice(match.index + match[0].length).split('\n').slice(1)
+    const body = []
+    for (const line of lines) {
+      if (line.trim() === delimiter) break
+      body.push(line)
+    }
+    if (body.every((line) => line.trim().length === 0)) continue
+    if (INTERPRETER_FEED.test(command.slice(0, match.index))) return { id: 'heredoc-interpreter', delimiter, lines: body.length }
+  }
+  return undefined
 }
 
 /** Which policy glob, if any, protects this candidate. */
@@ -308,6 +391,30 @@ export function apply(ctx, config) {
           reason,
         })
         return { kind: 'deny', reason, info: { code: 'protected_path', pattern: hit.pattern, path: hit.rel } }
+      }
+
+      const unverifiable = bashUnverifiable(command)
+      if (unverifiable !== undefined && policy.destructiveConfirm === true) {
+        bump(askedBySession, sessionId)
+        const reason = `guard: this command feeds a script to an interpreter through a heredoc (${unverifiable.delimiter}), so what it writes cannot be read from the command line; confirm before it runs.`
+        await recordBlocked(workspace, {
+          at: new Date().toISOString(),
+          sessionId,
+          callId,
+          tool: toolName,
+          decision: 'ask',
+          pattern: unverifiable.id,
+          command: command.slice(0, 400),
+          reason,
+        })
+        return {
+          kind: 'ask',
+          reason,
+          displayReason: {
+            en: 'Allow a script from a heredoc? The guard cannot see which files it writes.',
+            ru: 'Разрешить скрипт из heredoc? Guard не видит, в какие файлы он пишет.',
+          },
+        }
       }
 
       const destructive = destructiveMatch(command)

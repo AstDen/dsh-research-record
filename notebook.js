@@ -47,18 +47,46 @@ const MAX_INPUT_BYTES = 512 * 1024
 
 /** Crockford base32 — ULID, monotone enough for a journal. */
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+/** The last id this process minted, so ids created in one millisecond still order. */
+let lastUlidTime = -1
+let lastUlidRandom = null
+
+function randomPart() {
+  const bytes = randomBytes(16)
+  const chars = new Array(16)
+  for (let index = 0; index < 16; index += 1) chars[index] = ULID_ALPHABET[bytes[index] % 32]
+  return chars.join('')
+}
+
+/** Increment a base32 string as a number; null when every digit is at 31. */
+function incrementRandom(chars) {
+  const next = chars.split('')
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    const position = ULID_ALPHABET.indexOf(next[index])
+    if (position < ULID_ALPHABET.length - 1) {
+      next[index] = ULID_ALPHABET[position + 1]
+      return next.join('')
+    }
+    next[index] = ULID_ALPHABET[0]
+  }
+  return null
+}
 
 export function ulid(now = Date.now()) {
-  let time = Math.floor(now)
+  const start = Math.floor(now)
+  let time = start
   const timePart = new Array(10)
   for (let index = 9; index >= 0; index -= 1) {
     timePart[index] = ULID_ALPHABET[time % 32]
     time = Math.floor(time / 32)
   }
-  const bytes = randomBytes(16)
-  const randomPart = new Array(16)
-  for (let index = 0; index < 16; index += 1) randomPart[index] = ULID_ALPHABET[bytes[index] % 32]
-  return `${timePart.join('')}${randomPart.join('')}`
+  // Two records created in the same millisecond must still compare in creation
+  // order: the identifier is what a search uses to break a tie on createdAt, and
+  // a random tail would put the older record first half the time.
+  if (start === lastUlidTime && lastUlidRandom !== null) lastUlidRandom = incrementRandom(lastUlidRandom) ?? randomPart()
+  else lastUlidRandom = randomPart()
+  lastUlidTime = start
+  return `${timePart.join('')}${lastUlidRandom}`
 }
 
 /** Stable stringify: sorted keys, no whitespace. The hash input. */

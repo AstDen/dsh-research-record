@@ -1,3 +1,33 @@
+## 0.8.3 — the guard reads where a command actually writes
+
+Two misses found by probing the real classifier rather than reading it:
+`cd data && rm raw.csv` reported `raw.csv` (resolved at the workspace root, so
+the write looked innocent), and a script handed to an interpreter through a
+heredoc reported nothing at all.
+
+### The guard
+
+- `bashCandidates` splits a command into list/pipeline segments and tracks `cd`,
+  so a relative destination resolves against the directory the command is in; an
+  absolute `cd` keeps an absolute candidate, and a `cd` that leaves the workspace
+  stops the guess instead of inventing a path.
+- `bashUnverifiable` recognises `<<'DELIM'` fed to an interpreter (`python3`,
+  `node`, `perl`, `ruby`, `php`, `Rscript`, a shell) and the guard **asks** before
+  it runs — the body is data to a token scanner, so a silent pass would be a
+  guess. An empty heredoc and a heredoc into `cat`/`tee` stay silent: the latter
+  is checked by its destination like any other redirect.
+- The verb itself is no longer reported as a destination: `cd data && rm raw.csv`
+  yields one candidate (`data/raw.csv`), not `data/rm` as well.
+- `M16` (five checks) and `M17` (five checks) in `smoke-regress.mjs`; that suite
+  is 39 → 49 checks.
+
+### Identifiers are monotone within a millisecond
+
+`ulid()` increments its random tail when called twice in the same millisecond, so
+two records created together compare in creation order. Without that, the search
+tie-break — which uses the identifier when `createdAt` matches — put the older
+record first about half the time; the `Small` case caught it intermittently.
+
 ## 0.8.2 — the fixes the audit asked for, each with a test that failed before it
 
 An external audit of 0.8.1 (commit `57c0cc8`) found one blocker, eight high and

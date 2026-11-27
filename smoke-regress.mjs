@@ -251,6 +251,49 @@ async function sha256(text) {
   check('M2', 'policy_status prints the exemptions', /^allowed:\s+.*derived/m.test(statusText), statusText.split('\n').slice(0, 7).join(' | '))
 }
 
+// ── M16: a relative write after `cd` resolves against that directory ──────
+{
+  const host = await freshHost()
+  const preExecute = (host.ctx.__handlers.get('tools/pre-execute') ?? [])[0]
+  const decide = async (command) =>
+    (await preExecute({ name: 'bash', callId: `call-${Math.random()}`, agent: { id: 's1' }, arguments: { command } }, async () => ({ kind: 'allow' })))?.kind ?? 'undefined'
+  const candidates = guard.bashCandidates('cd data && rm raw.csv')
+  check('M16', 'a write after cd is reported where it lands', candidates.includes('data/raw.csv'), JSON.stringify(candidates))
+  const denied = await decide('cd data && rm raw.csv')
+  const allowed = await decide('cd derived && rm old.csv')
+  check(
+    'M16',
+    'cd data && rm raw.csv is denied, cd derived && rm old.csv is allowed',
+    denied === 'deny' && allowed === 'allow',
+    `deny=${denied} allow=${allowed}`,
+  )
+  const plain = guard.bashCandidates('cd data && rm raw.csv')
+  check('M16', 'the verb is not reported as a destination', plain.length === 1 && plain[0] === 'data/raw.csv', JSON.stringify(plain))
+  const absolute = guard.bashCandidates('cd /tmp && rm -f notes.csv')
+  check('M16', 'cd to an absolute path keeps the absolute candidate', absolute.includes('/tmp/notes.csv'), JSON.stringify(absolute))
+  const read = await decide('cd data && cat raw.csv')
+  check('M16', 'reading after cd is still allowed', read === 'allow', `decision=${read}`)
+}
+
+// ── M17: an interpreter fed through a heredoc is a question, not a pass ───
+{
+  const host = await freshHost()
+  const preExecute = (host.ctx.__handlers.get('tools/pre-execute') ?? [])[0]
+  const decide = async (command) =>
+    (await preExecute({ name: 'bash', callId: `call-${Math.random()}`, agent: { id: 's1' }, arguments: { command } }, async () => ({ kind: 'allow' })))?.kind ?? 'undefined'
+  const script = "python3 - <<'PY'\nopen('data/raw.csv','w').write('x')\nPY"
+  const heredoc = await decide(script)
+  check('M17', 'a script from a heredoc asks instead of passing', heredoc === 'ask', `decision=${heredoc}`)
+  const empty = await decide("python3 - <<'PY'\nPY")
+  check('M17', 'an empty heredoc is not a question', empty === 'allow', `decision=${empty}`)
+  const textDoc = await decide("cat > derived/notes.md <<'EOF'\n# notes\nEOF")
+  check('M17', 'a heredoc into a file is checked by its destination, not asked', textDoc === 'allow', `decision=${textDoc}`)
+  const blockedDoc = await decide("cat > data/notes.md <<'EOF'\n# notes\nEOF")
+  check('M17', 'a heredoc writing a protected path is still denied', blockedDoc === 'deny', `decision=${blockedDoc}`)
+  const direct = guard.bashUnverifiable(script)
+  check('M17', 'bashUnverifiable names the delimiter and the body size', direct?.delimiter === 'PY' && direct?.lines === 1, JSON.stringify(direct))
+}
+
 // ── M3: max_files must actually stop the walk ─────────────────────────────
 {
   const host = await freshHost()

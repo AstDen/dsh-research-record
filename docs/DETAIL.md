@@ -377,8 +377,13 @@ the environment variable: that is the launcher's tree, never a project.
    workspace has it — the brief's "another project" means another workspace.
 4. **Guard checks `bash` heuristically.** Token scanning is not a shell parser;
    it errs on the side of denying the obvious writes (`> file`, `cp`, `rm`,
-   `sed -i`) and no more. A miss is a policy gap, not a silent allow of
-   everything.
+   `sed -i`) and no more. Two gaps that a live probe showed are closed rather
+   than documented away: a relative write after `cd` resolves against that
+   directory (`cd data && rm raw.csv` reports `data/raw.csv`), and a script fed
+   to an interpreter through a heredoc (`python3 - <<'PY' … PY`) now asks
+   instead of passing silently, because its body is data to a scanner. A heredoc
+   into a file is still judged by its destination. What remains is a miss, and a
+   miss is a policy gap, not a silent allow of everything.
 5. **A record that cannot be placed is an error.**
    resort, and the one that put a journal inside `node_modules/.bin` for an `npx`
    launch. It stays in the chain because a plain `node` script has nothing else,
