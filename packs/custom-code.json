@@ -1,0 +1,45 @@
+{
+  "id": "custom-code",
+  "title": "Самописный код и его сборка",
+  "kinds": {
+    "extensions": {
+      "f": "code",
+      "f90": "code",
+      "f95": "code",
+      "for": "code",
+      "cpp": "code",
+      "cc": "code",
+      "cxx": "code",
+      "hpp": "code",
+      "hxx": "code",
+      "cu": "code",
+      "jl": "code",
+      "m": "code",
+      "r": "code",
+      "pyx": "code",
+      "ino": "code",
+      "tex": "tex"
+    },
+    "names": {
+      "Makefile": "build",
+      "makefile": "build",
+      "CMakeLists.txt": "build",
+      "meson.build": "build",
+      "configure": "build",
+      "SConstruct": "build"
+    }
+  },
+  "dirs": [
+    { "id": "sources", "role": "analysis", "nameMatches": "^(src|source|sources|lib|include|build|cmake|obj)$" }
+  ],
+  "match": {
+    "files": [],
+    "names": ["Makefile", "CMakeLists.txt", "meson.build"],
+    "extensions": { "f90": 3, "cpp": 3, "cu": 1 }
+  },
+  "wording": {
+    "run": "запуск кода",
+    "raw-data": "входные файлы модели",
+    "analysis": "исходный код"
+  }
+}

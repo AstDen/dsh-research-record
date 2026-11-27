@@ -1,0 +1,46 @@
+{
+  "id": "literature",
+  "title": "Работа с научной литературой",
+  "kinds": {
+    "extensions": {
+      "ris": "bib",
+      "enw": "bib",
+      "nbib": "bib",
+      "csl": "bib",
+      "bibtex": "bib",
+      "bib": "bib"
+    },
+    "names": {
+      "library.bib": "bib",
+      "references.bib": "bib"
+    }
+  },
+  "dirs": [
+    {
+      "id": "refs",
+      "role": "literature",
+      "nameMatches": "^(refs|references|pdfs|papers|sources|articles|литература|статьи)$"
+    },
+    {
+      "id": "notes",
+      "role": "literature",
+      "nameMatches": "^(notes|reading|карточки|конспекты|заметки)$"
+    }
+  ],
+  "match": {
+    "files": [],
+    "names": [
+      "library.bib",
+      "references.bib"
+    ],
+    "extensions": {
+      "pdf": 10,
+      "bib": 1
+    }
+  },
+  "wording": {
+    "run": "прогон по корпусу",
+    "literature": "подборка источников",
+    "analysis": "разбор источников"
+  }
+}

@@ -1,0 +1,8 @@
+# profile backups taken before installs — not part of the plugin
+backup/
+
+# local runs and reports
+*.log
+.audit/
+.adopt/
+node_modules/

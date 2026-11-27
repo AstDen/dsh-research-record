@@ -1,0 +1,136 @@
+{
+  "id": "numeric-openfoam",
+  "title": "Численный расчёт на OpenFOAM-подобном решателе",
+  "kinds": {
+    "extensions": {
+      "cgns": "mesh",
+      "obj": "geometry",
+      "stl": "geometry",
+      "foam": "of-case",
+      "plt": "post",
+      "pvsm": "post",
+      "nam": "post",
+      "jrf": "post",
+      "vtk": "post",
+      "vtu": "post",
+      "ensight": "post",
+      "out": "log",
+      "xy": "table"
+    },
+    "names": {
+      "controlDict": "dict",
+      "fvSchemes": "dict",
+      "fvSolution": "dict",
+      "blockMeshDict": "dict",
+      "snappyHexMeshDict": "dict",
+      "decomposeParDict": "dict",
+      "transportProperties": "dict",
+      "thermophysicalProperties": "dict",
+      "turbulenceProperties": "dict",
+      "momentumTransport": "dict",
+      "physicalProperties": "dict",
+      "sampleDict": "dict",
+      "Make": "build",
+      "Allrun": "script",
+      "Allclean": "script"
+    },
+    "fieldNames": [
+      "p",
+      "p_rgh",
+      "U",
+      "Uf",
+      "T",
+      "k",
+      "epsilon",
+      "omega",
+      "nut",
+      "nuTilda",
+      "alphat",
+      "alpha",
+      "phi",
+      "rho",
+      "Qdot",
+      "qr",
+      "h",
+      "Cp",
+      "mu",
+      "Pr",
+      "Yi",
+      "N2",
+      "O2",
+      "CH4",
+      "CO2",
+      "H2O",
+      "H2",
+      "CO",
+      "AR",
+      "N2O"
+    ],
+    "fieldPattern": "^[A-Za-z][A-Za-z0-9_()+-]{0,20}$"
+  },
+  "dirs": [
+    {
+      "id": "time-directory",
+      "role": "run",
+      "nameMatches": "^(0|[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?)$",
+      "excludeFromNotable": true,
+      "fieldFiles": true,
+      "minExtensionless": 1
+    },
+    {
+      "id": "region-directory",
+      "role": "run",
+      "nameMatches": "^(fluid|solid|air|water|porous|region[0-9]+)$",
+      "excludeFromNotable": true,
+      "fieldFiles": true,
+      "minExtensionless": 2
+    },
+    {
+      "id": "processor",
+      "role": "run",
+      "nameMatches": "^processor[0-9]+$",
+      "excludeFromNotable": true
+    },
+    {
+      "id": "polyMesh",
+      "role": "run",
+      "nameMatches": "^polyMesh$",
+      "excludeFromNotable": true
+    },
+    {
+      "id": "postProcessing",
+      "role": "analysis",
+      "nameMatches": "^postProcessing$",
+      "excludeFromNotable": true
+    },
+    {
+      "id": "system",
+      "role": "run",
+      "nameMatches": "^system$",
+      "excludeFromNotable": true
+    },
+    {
+      "id": "constant",
+      "role": "run",
+      "nameMatches": "^constant$",
+      "excludeFromNotable": true
+    }
+  ],
+  "match": {
+    "files": [],
+    "names": [
+      "controlDict",
+      "fvSolution",
+      "fvSchemes"
+    ],
+    "extensions": {
+      "cgns": 1,
+      "cas.h5": 1
+    }
+  },
+  "wording": {
+    "run": "расчёт",
+    "raw-data": "входные конфигурации и геометрия",
+    "analysis": "постобработка расчёта"
+  }
+}

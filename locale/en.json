@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "Research record",
+    "description": "A hash-chained research notebook, a file provenance graph, and a guard for protected paths. Gives agents the notebook, notebook_search, notebook_verify, provenance_of_file, provenance_verify and policy_status tools, plus a Notebook panel and a Provenance panel in the web UI."
+  },
+  "notebook": {
+    "panel": "Notebook",
+    "empty": "No records yet. A hypothesis goes in before the run, an observation with its numbers and artifact path after it.",
+    "filter": "Type",
+    "all": "All",
+    "unverified": "unverified",
+    "missing": "artifact missing",
+    "superseded": "superseded",
+    "verify": "Verify chain",
+    "verified": "Chain intact",
+    "broken": "Chain broken"
+  },
+  "provenance": {
+    "action": "Provenance",
+    "title": "Provenance",
+    "empty": "No recorded step produced this file yet.",
+    "inputs": "Inputs",
+    "observed": "observed",
+    "inferred": "inferred",
+    "previous": "previous version",
+    "verify": "Check integrity",
+    "copy": "Copy chain"
+  }
+}

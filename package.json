@@ -1,0 +1,74 @@
+{
+  "name": "dsh-research-record",
+  "version": "0.8.0",
+  "description": "Hash-chained research notebook, file provenance graph, protected-path guard, research scaffold, journal figure tools, a privacy-preserving usage report and universal project adoption for DeepSeek Harness",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./notebook": "./notebook.js",
+    "./provenance": "./provenance.js",
+    "./guard": "./guard.js",
+    "./package.json": "./package.json",
+    "./scaffold": "./scaffold.js",
+    "./stack": "./stack.js",
+    "./figures": "./figures.js",
+    "./telemetry": "./telemetry.js",
+    "./survey": "./survey.js",
+    "./packs": "./packs.js"
+  },
+  "files": [
+    "index.js",
+    "notebook.js",
+    "provenance.js",
+    "guard.js",
+    "lock.js",
+    "scaffold.js",
+    "stack.js",
+    "figures.js",
+    "telemetry.js",
+    "client.js",
+    "cordis.patch.yml",
+    "figurelib",
+    "locale",
+    "icon.svg",
+    "docs",
+    "skills",
+    "survey.js",
+    "fixtures",
+    "packs",
+    "packs.js"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.0 <0.3.0"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "research",
+    "notebook",
+    "provenance",
+    "reproducibility",
+    "matplotlib",
+    "figures",
+    "usage",
+    "telemetry",
+    "report",
+    "adoption",
+    "project-survey",
+    "packs",
+    "openfoam",
+    "experiment"
+  ],
+  "license": "MIT"
+}

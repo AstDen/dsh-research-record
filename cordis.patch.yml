@@ -1,0 +1,59 @@
+# dsh-research-record — bundle layer.
+#
+# Eight host plugins, one client module. Install with:
+#   dsh plugin --profile web add /home/claster/Documents/deepseek-harness/default-workspace/dsh-research-record
+# (pnpm links the directory into the profile and adds the bundle to
+#  dsh.profile.bundles; a DSH restart is required afterwards).
+#
+# Override one row's config in $DSH_HOME/profiles/web/cordis.patch.yml:
+#   - id: research-record-guard
+#     config:
+#       protectedPaths: ['user_data/**', 'data/**']
+#       destructiveConfirm: true
+#
+# Every entry name resolves through this package's exports map, so the rows keep
+# working whether pnpm links the source directory or copies it into node_modules.
+- insert:
+    - id: research-record-notebook
+      name: 'dsh-research-record/notebook'
+      # config:
+      #   enabled: true
+      #   promptDigest: true
+
+    - id: research-record-provenance
+      name: 'dsh-research-record/provenance'
+      # config:
+      #   captureBashScans: true
+      #   maxEdgesPerStep: 200
+
+    - id: research-record-scaffold
+      name: 'dsh-research-record/scaffold'
+      # config: no keys — the scaffold is driven by its tool and /research-init
+
+    - id: research-record-stack
+      name: 'dsh-research-record/stack'
+      # config:
+      #   profile: web
+
+    - id: research-record-figures
+      name: 'dsh-research-record/figures'
+      # config: no keys — figure_spec and figure_check take their arguments
+      # from the call; the geometry lives in figurelib/style.py
+
+    - id: research-record-usage
+      name: 'dsh-research-record/telemetry'
+      # config:
+      #   enabled: true
+      #   recordAllTools: true
+      #   maxFileBytes: 5242880
+
+    - id: research-record-adopt
+      name: 'dsh-research-record/survey'
+      # config: no keys — project_survey and project_adopt take their arguments
+      # from the call; nothing is moved or deleted by the plugin
+
+    - id: research-record-guard
+      name: 'dsh-research-record/guard'
+      # config:
+      #   protectedPaths: []
+      #   destructiveConfirm: true

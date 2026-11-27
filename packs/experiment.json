@@ -1,0 +1,39 @@
+{
+  "id": "experiment",
+  "title": "Экспериментальная установка и измерения",
+  "kinds": {
+    "extensions": {
+      "lvm": "table",
+      "tdms": "table",
+      "spe": "table",
+      "asc": "table",
+      "dat": "table",
+      "dm3": "binary",
+      "nd2": "binary",
+      "czi": "binary",
+      "lif": "binary",
+      "tif": "image",
+      "tiff": "image",
+      "cine": "video"
+    },
+    "names": {
+      "settings.xml": "config",
+      "acquisition.xml": "config",
+      "metadata.xml": "config"
+    }
+  },
+  "dirs": [
+    { "id": "acquisition", "role": "raw-data", "nameMatches": "^(acquisition|acq|scan|record|запись|съемка|съёмка)$" },
+    { "id": "calibration", "role": "analysis", "nameMatches": "^(calibration|калибровка)$" }
+  ],
+  "match": {
+    "files": [],
+    "names": ["settings.xml", "acquisition.xml"],
+    "extensions": { "lvm": 3, "tdms": 1, "cine": 1 }
+  },
+  "wording": {
+    "run": "серия измерений",
+    "raw-data": "первичные записи прибора",
+    "derived": "обработанные записи"
+  }
+}
