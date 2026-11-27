@@ -62,7 +62,7 @@ be written before the calculation. The scaffold makes that explicit once, and th
 prompt carries it afterwards.
 
 ```text
-/research-init Пористое горение        # or: the model calls research_init
+/research-init Porous combustion      # or: the model calls research_init
 ```
 
 Both entry points run the same `scaffoldResearchProject(workspace, options)`:
@@ -217,7 +217,7 @@ prompts, journal bodies.
 ```text
 usage_report action="summary" days=30     # print the report
 usage_report action="export"              # write .dsh/usage/report-<stamp>.md + .json
-/usage-report [дней|export]               # the same from the chat
+/usage-report [days|export]               # the same from the chat
 ```
 
 The report has four blocks: the tool table (calls, errors, p50, last use), the

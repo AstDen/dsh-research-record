@@ -8,7 +8,7 @@
  *
  * Every entry was checked against the registry (version, licence, engines.dsh,
  * Linux support read from the code) on the `verified` date. Anything not checked
- * is marked НЕ ПОДТВЕРЖДЕНО in `note` instead of being presented as fact.
+ * is marked NOT VERIFIED in `note` instead of being presented as fact.
  */
 
 /** core = the work is crippled without it; optional = clear gain for a common task;
@@ -19,75 +19,75 @@ import { getService } from './services.js'
 export const STACK = [
   {
     id: 'record',
-    title: 'Научная запись',
+    title: 'Scientific record',
     level: 'core',
     verified: '2026-11-27',
-    why: 'Журнал гипотез с хеш-цепочкой, провенанс файлов, guard на сырые данные. Без него через месяц никто не помнит, откуда взялось число.',
+    why: 'Hypothesis journal with a hash chain, file provenance, a guard on raw data. Without it, a month later nobody remembers where a number came from.',
     packages: [],
-    note: 'Этот бандл (research-record). Уже установлен.',
+    note: 'This bundle (research-record). Already installed.',
   },
   {
     id: 'literature',
-    title: 'Литература, Zotero, BibTeX',
+    title: 'Literature, Zotero, BibTeX',
     level: 'core',
     verified: '2026-11-27',
-    why: 'Читать свою библиотеку и фуллтексты, получать BibTeX из DOI, искать фрагменты книг в RAG-базе — без ручного копирования ссылок.',
+    why: 'Read your own library and full texts, get BibTeX from a DOI, search book passages in a RAG store — without copying references by hand.',
     packages: ['dsh-zotero-local@0.4.0', 'dsh-cite@0.13.1', 'dsh-kb-rag'],
     install: 'dsh plugin --profile web add dsh-zotero-local dsh-cite dsh-kb-rag',
-    conflicts: 'Один Zotero-читатель на профиль: dsh-zotero-local, dsh-zotero и dsh-plugin-zotero перекрываются по именам тулов и пишут в одну библиотеку.',
-    note: 'dsh-zotero-local читает локальный API Zotero (23119), включая фуллтекст и аннотации: 17 тулов, 0 peers, 368 КБ. dsh-plugin-zotero без аддона zotero-integrated-mcp на 23120 умеет только писать заметки — как единственный Zotero-плагин он бесполезен.',
+    conflicts: 'One Zotero reader per profile: dsh-zotero-local, dsh-zotero and dsh-plugin-zotero overlap in tool names and write to the same library.',
+    note: 'dsh-zotero-local reads the local Zotero API (23119), including full text and annotations: 17 tools, 0 peers, 368 KB. Without the zotero-integrated-mcp add-on on 23120, dsh-plugin-zotero can only write notes — as the only Zotero plugin it is useless.',
   },
   {
     id: 'latex',
-    title: 'LaTeX: собрать и увидеть страницу',
+    title: 'LaTeX: build it and see the page',
     level: 'core',
     verified: '2026-11-27',
-    why: 'Компиляция, рендер страницы, SyncTeX (строка исходника ↔ место на странице), diff с прошлой версией. Ошибку видно глазами, а не по логу.',
+    why: 'Compile, render a page, SyncTeX (source line ↔ place on the page), diff against the previous version. You see the error with your eyes, not in the log.',
     packages: ['@fffangchenghao/dsh-latex-look@0.4.5'],
     install: 'dsh plugin --profile web add @fffangchenghao/dsh-latex-look',
-    note: 'Нужны TeX Live (xelatex) и Ghostscript. Кириллица — fontspec + polyglossia; fontenc T2A под xelatex молча теряет русские буквы. Аудит цитат (dsh-latex-guard) — отдельно: установщик требует version exemption на 0.2.2-rc.5.',
+    note: 'Needs TeX Live (xelatex) and Ghostscript. Cyrillic: fontspec + polyglossia; fontenc T2A under xelatex silently drops Russian letters. Citation audit (dsh-latex-guard) is separate: the installer requires a version exemption for 0.2.2-rc.5.',
   },
   {
     id: 'pdf',
-    title: 'Чтение PDF постранично',
+    title: 'Reading PDF page by page',
     level: 'core',
     verified: '2026-11-27',
-    why: 'Outline, текст и поиск по конкретным страницам, рендер области в картинку — вместо загрузки всего PDF в контекст.',
+    why: 'Outline, text and search over specific pages, render a region to an image — instead of pulling a whole PDF into the context.',
     packages: ['dsh-pdf-tools@0.1.0'],
     install: 'dsh plugin --profile web add dsh-pdf-tools',
-    conflicts: 'Не ставить вместе с dsh-pdf-formula: оба регистрируют тул pdf_info.',
-    note: 'Системных бинарников не требует (canvas — prebuilt). Сканы без текстового слоя не читает: локального OCR в экосистеме нет.',
+    conflicts: 'Do not install together with dsh-pdf-formula: both register the pdf_info tool.',
+    note: 'No system binaries needed (canvas is prebuilt). Does not read scans without a text layer: there is no local OCR in the ecosystem.',
   },
   {
     id: 'tables',
-    title: 'Таблицы, данные из PDF',
+    title: 'Tables, data from PDF',
     level: 'core',
     verified: '2026-11-27',
-    why: 'Профиль датасета, чистка с аудитом, проверка правил — и таблицы из PDF локально, без облака.',
+    why: 'Dataset profile, cleaning with an audit trail, rule checks — and tables from PDF locally, without the cloud.',
     packages: ['dsh-data-quality@0.3.30', 'dsh-table-ingest@0.2.6', 'dsh-pdf-table@0.2.2'],
     install: 'dsh plugin --profile web add dsh-data-quality dsh-table-ingest dsh-pdf-table',
-    note: 'dsh-pdf-table работает по текстовому слою: сканы без OCR не разберёт. Локального OCR-плагина в экосистеме нет.',
+    note: 'dsh-pdf-table works off the text layer: it cannot handle a scan without OCR. There is no local OCR plugin in the ecosystem.',
   },
   {
     id: 'documents',
-    title: 'Документы и презентации',
+    title: 'Documents and presentations',
     level: 'optional',
     verified: '2026-11-27',
-    why: 'Доклад в HTML-слайдах и в .pptx, правка docx с ревизией; отчёт в docx/xlsx.',
+    why: 'A talk as HTML slides and as .pptx, docx editing with tracked revisions; a report in docx/xlsx.',
     packages: ['revealjs-generate', 'dsh-pptx-builder@1.1.0', 'dsh-docx-redline@0.2.2'],
     install: 'dsh plugin --profile web add revealjs-generate dsh-pptx-builder dsh-docx-redline',
-    conflicts: 'Генераторов колод не больше двух: revealjs (HTML) + pptx-builder (.pptx). office-pptx из встроенных скиллов — для правки, не для сборки с нуля.',
-    note: 'docx/xlsx/pptx приходят скиллами office-*; дополнительный редактор docx ставить не нужно.',
+    conflicts: 'No more than two deck generators: revealjs (HTML) + pptx-builder (.pptx). office-pptx from the built-in skills is for editing, not for building from scratch.',
+    note: 'docx/xlsx/pptx come with the office-* skills; no extra docx editor is needed.',
   },
   {
     id: 'statistics',
-    title: 'Проверка статистики и воспроизводимости',
+    title: 'Statistics and reproducibility checks',
     level: 'optional',
     verified: '2026-11-27',
-    why: 'Пересчёт «t(df)=…, p=…» из текста статьи; манифест воспроизводимости (коммит, lockfile, сиды, хэши данных).',
+    why: 'Recompute "t(df)=…, p=…" from the article text; a reproducibility manifest (commit, lockfile, seeds, data hashes).',
     packages: ['@perrylink/dsh-research-core@0.1.6', 'dsh-statcheck@0.1.4', 'dsh-repro-audit@0.1.6'],
     install: 'dsh plugin --profile web add @perrylink/dsh-research-core dsh-statcheck dsh-repro-audit',
-    note: 'dsh-statcheck импортирует research-core жёстко: ставить только парой. Дальше по желанию dsh-manuscript-check (рукопись), dsh-sr-ledger (обзор), dsh-retraction-watch (отозванные статьи, нужна сеть).',
+    note: 'dsh-statcheck imports research-core hard: install only as a pair. Then, optionally, dsh-manuscript-check (manuscript), dsh-sr-ledger (review), dsh-retraction-watch (retracted papers, needs network).',
   },
   {
     id: 'fluent',
@@ -95,42 +95,42 @@ export const STACK = [
     level: 'situational',
     local: true,
     verified: '2026-11-27',
-    why: 'Интервью по задаче → journal → запуск Fluent → разбор транскрипта → отчёт. В реестре DSH других Fluent-плагинов нет вообще.',
+    why: 'Task interview → journal → run Fluent → parse the transcript → report. There are no other Fluent plugins in the DSH registry at all.',
     packages: ['fluent-case-builder@0.6.0'],
-    install: 'cd <путь к fluent-case-builder> && dsh plugin --profile web add "$PWD"',
-    note: 'Ставится как локальный путь (link), не из реестра. Нужен установленный Fluent (v261) и живая лицензия.',
+    install: 'cd <path to fluent-case-builder> && dsh plugin --profile web add "$PWD"',
+    note: 'Installed as a local path (link), not from the registry. Needs Fluent (v261) installed and a live licence.',
   },
   {
     id: 'openfoam',
-    title: 'OpenFOAM: кейс, сетка, верификация',
+    title: 'OpenFOAM: case, mesh, verification',
     level: 'situational',
     verified: '2026-11-27',
-    why: 'Полный цикл: словари, сетка snappy/cfMesh/gmsh, запуск, проверка сходимости, рендер полей.',
+    why: 'Full cycle: dictionaries, snappy/cfMesh/gmsh mesh, run, convergence check, field rendering.',
     packages: ['@yakovlev-i-a/dsh-openfoam-workbench@0.9.32', 'mesh-toolkit@1.3.1'],
     install: 'dsh plugin --profile web add @yakovlev-i-a/dsh-openfoam-workbench mesh-toolkit',
-    conflicts: 'НЕ ставить вместе с @bushizhanghan/dsh-openfoam-doctor: он зовёт wsl.exe и на Linux нерабочий, а его 6 тулов — дубль workbench.',
-    note: 'mesh-toolkit читает sim-project.json вверх от cwd: запускать из корня проекта. cfMesh есть только в com-сборке OpenFOAM.',
+    conflicts: 'Do NOT install together with @bushizhanghan/dsh-openfoam-doctor: it calls wsl.exe and does not work on Linux, and its 6 tools duplicate workbench.',
+    note: 'mesh-toolkit reads sim-project.json upwards from cwd: run it from the project root. cfMesh exists only in the com build of OpenFOAM.',
   },
   {
     id: 'hpc',
-    title: 'Расчёты на других машинах',
+    title: 'Compute on other machines',
     level: 'situational',
     verified: '2026-11-27',
-    why: 'SSH-воркспейсы на хостах кластера: выполнить команду, забрать файл, пробросить порт — не уходя из чата.',
+    why: 'SSH workspaces on cluster hosts: run a command, fetch a file, forward a port — without leaving the chat.',
     packages: ['dsh-remote@1.5.0'],
     install: 'dsh plugin --profile web add dsh-remote',
-    note: 'Планировщика очереди (Slurm/sbatch) в экосистеме нет: dsh-remote даёт rw_exec, corewatch-mcp — только мониторинг. dsh-scnet не подходит: он про SCNet.',
+    note: 'There is no queue scheduler (Slurm/sbatch) in the ecosystem: dsh-remote gives rw_exec, corewatch-mcp only monitors. dsh-scnet does not fit: it is about SCNet.',
   },
   {
     id: 'infra',
-    title: 'Инфраструктура работы',
+    title: 'Working infrastructure',
     level: 'optional',
     verified: '2026-11-27',
-    why: 'Поиск по прошлым сессиям, параллельные линии работы с задачами, учёт денег.',
+    why: 'Search across past sessions, parallel lines of work with tasks, cost tracking.',
     packages: ['@deepseek-ai/dsh-experimental-session-search', '@nanmicoder/dsh-agent-teams@0.1.31', 'dsh-cost-meter'],
     install: 'dsh plugin --profile web add @deepseek-ai/dsh-experimental-session-search @nanmicoder/dsh-agent-teams dsh-cost-meter',
-    conflicts: 'Community-плагин dsh-session-search 0.1.1 не ставить: его engines.dsh кончается на 0.2.1-rc.1.',
-    note: 'Официальный session-search уже покрывает поиск по истории; agent-teams нужен, когда работа идёт параллельными линиями.',
+    conflicts: 'Do not install the community plugin dsh-session-search 0.1.1: its engines.dsh ends at 0.2.1-rc.1.',
+    note: 'The official session-search already covers history search; agent-teams is needed when work runs along parallel lines.',
   },
 ]
 
@@ -138,101 +138,101 @@ export const STACK = [
 export const AVOID = [
   {
     packages: ['@bushizhanghan/dsh-openfoam-doctor'],
-    reason: 'Зовёт wsl.exe и отбрасывает не-WSL пути — на Linux тулы не регистрируются; функции покрыты openfoam-workbench.',
+    reason: 'Calls wsl.exe and rejects non-WSL paths — on Linux its tools do not register at all; the function is covered by openfoam-workbench.',
   },
   {
     packages: ['dsh-session-search@0.1.1'],
-    reason: 'engines.dsh заканчивается на 0.2.1-rc.1, установка на 0.2.2-rc.5 сломает профиль.',
+    reason: 'engines.dsh ends at 0.2.1-rc.1; installing it on 0.2.2-rc.5 breaks the profile.',
   },
   {
     packages: ['@kikulmj/dsh-jupyter'],
-    reason: 'Регистрирует тул с именем python — конфликт с любым python-плагином и с моделью.',
+    reason: 'Registers a tool named python — a clash with any python plugin and with the model.',
   },
   {
     packages: ['@copylee/dsh-office'],
-    reason: 'Тулы office_render/office_read совпадают с именами встроенного скилла office; вдобавок требует Windows и MS Office.',
+    reason: 'office_render/office_read collide with the names of the built-in office skill; on top of that it requires Windows and MS Office.',
   },
   {
     packages: ['dsh-pptx-sidebar', 'dsh-docx-sidebar'],
-    reason: 'engines.dsh <0.2.1 — несовместимы с текущей версией.',
+    reason: 'engines.dsh <0.2.1 — incompatible with the current version.',
   },
   {
     packages: ['dsh-office-kit', 'dsh-pptx-studio'],
-    reason: 'Проверены только на Windows (capability-файл/рендер через PowerShell); тянут десяток pip-пакетов.',
+    reason: 'Verified on Windows only (capability file/render through PowerShell); pull in a dozen pip packages.',
   },
   {
     packages: ['dsh-typst', 'dsh-typst-plugin'],
-    reason: 'Бинарника typst на хосте нет; без него первый отдаёт несобранный .typ, второй — 34 peer-зависимости ради UI.',
+    reason: 'There is no typst binary on the host; without it the first hands back an uncompiled .typ and the second brings 34 peer dependencies for a UI.',
   },
   {
     packages: ['dsh-pdf-formula'],
-    reason: 'Регистрирует pdf_info, как и dsh-pdf-tools: второй плагин упадёт на дубликате имени. Ставить один из двух.',
+    reason: 'Registers pdf_info, just like dsh-pdf-tools: the second plugin dies on the duplicate name. Install one of the two.',
   },
   {
     packages: ['dsh-latex-studio', 'dsh-latex-tools', 'dsh-latex-editor'],
-    reason: 'studio — третий компилятор в том же каталоге и запись .bib на месте; tools и editor не дают модельных тулов для науки.',
+    reason: 'studio is a third compiler in the same directory and writes .bib in place; tools and editor provide no model-facing tools for science.',
   },
   {
     packages: ['dsh-zotero', '@hanxu131/dsh-zotero'],
-    reason: 'dsh-zotero тянет 17 зависимостей и 30 МБ, читая zotero.sqlite при запущенном Zotero (риск блокировок); @hanxu131 требует dsh >=0.2.3-alpha.2 и на 0.2.2-rc.5 не встанет.',
+    reason: 'dsh-zotero pulls 17 dependencies and 30 MB, reading zotero.sqlite while Zotero is running (risk of locks); @hanxu131 requires dsh >=0.2.3-alpha.2 and will not install on 0.2.2-rc.5.',
   },
   {
     packages: ['@ggboy123/dsh-paper-reader', '@eduwork/dsh-literature', '@shlv/dsh-literature', '@zhe_xuan/dsh-paper-desk'],
-    reason: 'Либо вытеснены (paper-reader-evidence вместо paper-reader), либо делят имена тулов literature_*, либо тянут 11 @deepseek-ai-peers, либо вводят вторую библиотеку рядом с Zotero.',
+    reason: 'Either superseded (paper-reader-evidence instead of paper-reader), or they share the literature_* tool names, or pull 11 @deepseek-ai peers, or introduce a second library next to Zotero.',
   },
   {
     packages: ['dsh-pdf-mineru'],
-    reason: 'Требует облачный MinerU (ключ) или self-hosted сервис — не офлайн.',
+    reason: 'Requires the cloud MinerU (API key) or a self-hosted service — not offline.',
   },
 ]
 
 /** What the ecosystem does not have, so nobody searches twice. */
 export const GAPS = [
-  'Проверка качества рисунков (шрифты, DPI, colorblind-палитра, «перерисуй рисунок 3») — нет ни одного пакета.',
-  'Обёртки matplotlib/plotly/vega с научными палитрами — нет; dsh-chart рисует свой SVG для черновых картинок.',
-  'Markdown/HTML → PDF — нет; есть Office→PDF (alpha) и Typst→PDF (нужен бинарник).',
-  'Локальный OCR для сканов — нет; tesseract.js есть только внутри CLI, а не плагином.',
-  'Запись аннотаций внутрь PDF-файла — нет, все хранят их в своей базе.',
-  'Единый менеджер .bib с блокировками и синхронизацией с Zotero — нет.',
-  'Slurm/очередь заданий, gmsh, ParaView, Cantera, COMSOL, HDF5 как плагины — нет.',
-  'Fluent и CFD как категория — ноль пакетов в реестре (13 445 записей); fluent-case-builder существует только как локальный путь.',
-  'Мост «Zotero MCP» как DSH-плагин — нет: порт 23120 обслуживает аддон Zotero, а npm-пакеты zotero-mcp — обычные MCP-серверы.',
+  'Figure quality checks (fonts, DPI, colorblind palette, "redraw figure 3") — not a single package.',
+  'matplotlib/plotly/vega wrappers with scientific palettes — none; dsh-chart draws its own SVG for draft figures.',
+  'Markdown/HTML → PDF — none; there is Office→PDF (alpha) and Typst→PDF (needs the binary).',
+  'Local OCR for scans — none; tesseract.js exists only inside a CLI, not as a plugin.',
+  'Writing annotations into the PDF file itself — none; every plugin keeps them in its own database.',
+  'A single .bib manager with locking and Zotero sync — none.',
+  'Slurm/job queue, gmsh, ParaView, Cantera, COMSOL, HDF5 as plugins — none.',
+  'Fluent and CFD as a category — zero packages in the registry (13 445 records); fluent-case-builder exists only as a local path.',
+  'A "Zotero MCP" bridge as a DSH plugin — none: port 23120 is served by the Zotero add-on, and the zotero-mcp npm packages are plain MCP servers.',
 ]
 
 /** Task -> tool routing: which installed plugin answers which question. */
 export const ROUTING = [
   [
-    'Существующий проект: разобраться, что где лежит, прежде чем что-то менять',
-    'project_survey (карта и факты) → project_adopt (три режима) → перенос по одному с decision',
+    'An existing project: learn what sits where before changing anything',
+    'project_survey (map and facts) → project_adopt (three modes) → migrate one item at a time with a decision',
     ['project_survey', 'project_adopt'],
   ],
 
   // [task, how it is done, tools this bundle expects to exist]
   //
   // The third column is explicit because the second one is prose: parsing tool
-  // names out of "скрипт в analysis/scripts/ → артефакт в analysis/figures"
+  // names out of "a script in analysis/scripts/ → an artifact in analysis/figures"
   // produced advice about tools that do not exist. A row with `[]` is script
   // work with no tool of its own, and the usage report skips it instead of
   // reporting it as an unused capability.
-  ['PDF: страницы, раздел, цитата, таблица', 'pdf_info → pdf_outline/pdf_search → pdf_text; таблицы pdf_tables/pdf_to_csv; скан pdf_render',
+  ['PDF: pages, a section, a quotation, a table', 'pdf_info → pdf_outline/pdf_search → pdf_text; tables pdf_tables/pdf_to_csv; a scan pdf_render',
     ['pdf_info', 'pdf_outline', 'pdf_search', 'pdf_text', 'pdf_tables', 'pdf_to_csv', 'pdf_render']],
-  ['Zotero: что есть, о чём статья, аннотации', 'zotero_search → zotero_digest/zotero_retrieve/zotero_fulltext; zotero_annotations; zotero_export',
+  ['Zotero: what is there, what a paper is about, annotations', 'zotero_search → zotero_digest/zotero_retrieve/zotero_fulltext; zotero_annotations; zotero_export',
     ['zotero_search', 'zotero_digest', 'zotero_retrieve', 'zotero_fulltext', 'zotero_annotations', 'zotero_export']],
-  ['ссылки и .bib: найти, оформить, проверить', 'cite_lookup, cite_format, cite_bibtex, cite_check, cite_batch',
+  ['references and .bib: find, format, check', 'cite_lookup, cite_format, cite_bibtex, cite_check, cite_batch',
     ['cite_lookup', 'cite_format', 'cite_bibtex', 'cite_check', 'cite_batch']],
-  ['таблицы и данные: профиль, качество, очистка', 'data_profile, data_verify, data_clean; xlsx/docx/csv → table_ingest',
+  ['tables and data: profile, quality, cleaning', 'data_profile, data_verify, data_clean; xlsx/docx/csv → table_ingest',
     ['data_profile', 'data_verify', 'data_clean', 'table_ingest']],
-  ['статистика в рукописи и воспроизводимость', 'stat_check, stat_recompute; repro_manifest → repro_check → repro_card',
+  ['statistics in a manuscript and reproducibility', 'stat_check, stat_recompute; repro_manifest → repro_check → repro_card',
     ['stat_check', 'stat_recompute', 'repro_manifest', 'repro_check', 'repro_card']],
-  ['любое число и график', 'скрипт в analysis/scripts/ → артефакт в analysis/figures или runs/<id>/results', []],
-  ['статья: правка текста и вид страницы', 'latex_look (compile + render + SyncTeX + diff)', ['latex_look']],
-  ['презентация', 'pptx_create → pptx_add_slide(template) → pptx_add_chart/pptx_add_math/pptx_add_image',
+  ['any number and any figure', 'a script in analysis/scripts/ → an artifact in analysis/figures or runs/<id>/results', []],
+  ['a paper: text edits and how the page looks', 'latex_look (compile + render + SyncTeX + diff)', ['latex_look']],
+  ['a presentation', 'pptx_create → pptx_add_slide(template) → pptx_add_chart/pptx_add_math/pptx_add_image',
     ['pptx_create', 'pptx_add_slide', 'pptx_add_chart', 'pptx_add_math', 'pptx_add_image']],
-  ['.docx: структура, правка, сравнение версий', 'doc_inspect → doc_replace_text / redline_diff / doc_change_summary',
+  ['.docx: structure, editing, version comparison', 'doc_inspect → doc_replace_text / redline_diff / doc_change_summary',
     ['doc_inspect', 'doc_replace_text', 'redline_diff', 'doc_change_summary']],
-  ['CFD: кейс, сетка, прогон, поля', 'openfoam_* (workbench), fluent_case_* (Fluent), mesh_build / mesh_check / stl_*',
+  ['CFD: case, mesh, run, fields', 'openfoam_* (workbench), fluent_case_* (Fluent), mesh_build / mesh_check / stl_*',
     ['openfoam_run', 'openfoam_check', 'fluent_case_run', 'mesh_build', 'mesh_check']],
-  ['журнал и провенанс', 'notebook, notebook_search, notebook_verify, provenance_of_file, provenance_verify',
+  ['journal and provenance', 'notebook, notebook_search, notebook_verify, provenance_of_file, provenance_verify',
     ['notebook', 'notebook_search', 'notebook_verify', 'provenance_of_file', 'provenance_verify']],
 ]
 
@@ -268,11 +268,11 @@ export function renderStack({ level } = {}) {
   const items = STACK.filter((entry) => (everyLevel ? true : entry.level === level))
   const blocks = items.map(renderEntry)
   if (everyLevel) {
-    blocks.push(`✕ Не ставить\n${AVOID.map((item) => `   ${item.packages.join(', ')} — ${item.reason}`).join('\n')}`)
-    blocks.push(`∅ Чего нет в экосистеме\n${GAPS.map((gap) => `   · ${gap}`).join('\n')}`)
+    blocks.push(`✕ Do not install\n${AVOID.map((item) => `   ${item.packages.join(', ')} — ${item.reason}`).join('\n')}`)
+    blocks.push(`∅ Missing from the ecosystem\n${GAPS.map((gap) => `   · ${gap}`).join('\n')}`)
   }
-  blocks.push('● обязательно · ○ заметная польза · ◌ под конкретную задачу')
-  blocks.push(`Проверено по реестру: ${[...new Set(STACK.map((entry) => entry.verified))].sort().pop()}`)
+  blocks.push('● required · ○ clear gain · ◌ for a specific task')
+  blocks.push(`Checked against the registry: ${[...new Set(STACK.map((entry) => entry.verified))].sort().pop()}`)
   return blocks.join('\n\n')
 }
 
@@ -291,9 +291,9 @@ export const name = 'research-record-stack'
 export const inject = ['tools', 'commands', 'systemPrompt']
 
 const PROMPT_TEXT =
-  'Стек научной работы. /research-stack показывает рекомендуемые плагины по уровням (core/optional/situational), что не ставить и чего нет в экосистеме; тул research_stack делает то же (action "show") и ставит выбранный уровень (action "install", confirm:true; без confirm печатает команду). Задача → инструмент:\n' +
+  'Research stack. /research-stack lists the recommended plugins by level (core/optional/situational), what not to install and what the ecosystem does not have; the research_stack tool does the same (action "show") and installs one chosen level (action "install", confirm:true; without confirm it only prints the command). Task → tool:\n' +
   renderRoutes() +
-  '\nПравило: если задача попадает в строку выше, идти этим тулом, а не bash-парсером или самодельным скриптом. Если нужного тула в наборе нет — сказать это и предложить /research-stack (установка), а не изобретать обход.'
+  '\nRule: if a task matches a row above, use that tool, not a bash parser or a hand-rolled script. If the tool set does not have the right tool — say so and point to /research-stack (install) instead of inventing a workaround.'
 
 /** Packages of one level ('all' = every level), registry specs only. */
 export function packagesForLevel(level) {
@@ -357,7 +357,7 @@ export function apply(ctx, config) {
   if (typeof commands?.register === 'function') {
     commands.register({
       name: 'research-stack',
-      description: 'Рекомендуемый стек плагинов для научной работы',
+      description: 'Recommended plugin stack for scientific work',
       input: { hint: '[core|optional|situational|routes]' },
       handler(invocation) {
         const raw = String(invocation?.rawInput ?? '').trim().toLowerCase()
@@ -408,21 +408,21 @@ export function apply(ctx, config) {
       const manual = locals.map((entry) => `# ${entry.title}\n${entry.install}`).join('\n')
       if (packages.length === 0) {
         return locals.length === 0
-          ? { ok: false, text: 'research_stack: для уровня "' + chosen + '" нет пакетов' }
+          ? { ok: false, text: 'research_stack: no packages for level "' + chosen + '"' }
           : {
               ok: true,
               local: locals.map((entry) => entry.id),
               text:
-                'research_stack: этот уровень ставится локальным путём, из реестра его нет.\n' +
+                'research_stack: this level is installed from a local path, the registry does not have it.\n' +
                 manual +
-                '\nУстановку выполняет человек: путь к каталогу знает только он.',
+                '\nA human performs the install: only they know the directory path.',
             }
       }
       const command = installCommand(packages, profile)
       if (args?.confirm !== true) {
         return {
           ok: true,
-          text: 'research_stack: ничего не изменено (нужен confirm:true).\n' + command + '\nПакеты: ' + packages.join(', '),
+          text: 'research_stack: nothing changed (confirm:true is required).\n' + command + '\nPackages: ' + packages.join(', '),
         }
       }
       const result = await runAdd(packages, profile)
@@ -431,10 +431,10 @@ export function apply(ctx, config) {
       const ro = /EROFS|EACCES|read-only/i.test(String(result.output ?? ''))
       const note = failed
         ? ro
-          ? '\n\nПрофиль лежит вне рабочей папки: процесс под sandbox не может в него писать. Выполните команду в терминале или переключите /permission danger-full-access и повторите.'
-          : '\n\nКоманда завершилась с ошибкой — смотрите вывод выше.'
-        : '\n\nГотово. Новые тулы появляются в наборе при загрузке профиля: обновите страницу и, если набор не изменился, перезапустите DSH.'
-      const manualNote = locals.length > 0 ? `\n\nЛокальные (не из реестра) — отдельно:\n${manual}` : ''
+          ? '\n\nThe profile lives outside the working folder: a sandboxed process cannot write into it. Run the command in a terminal or switch /permission danger-full-access and repeat.'
+          : '\n\nThe command failed — see the output above.'
+        : '\n\nDone. New tools appear in the set when the profile loads: refresh the page and, if the set has not changed, restart DSH.'
+      const manualNote = locals.length > 0 ? `\n\nLocal ones (not from the registry) — separately:\n${manual}` : ''
       return { ok: !failed, code: result.code, text: command + '\n\n' + tail + note + manualNote, local: locals.map((entry) => entry.id) }
     },
   })

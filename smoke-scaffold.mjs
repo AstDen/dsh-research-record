@@ -35,9 +35,9 @@ const exists = async (path) => {
 
 // --- 1. an empty directory becomes a research project ------------------------
 const workspace = await mkdtemp(join(tmpdir(), 'rr-scaffold-'))
-const report = await scaffold.scaffoldResearchProject(workspace, { name: 'Пористое горение' })
+const report = await scaffold.scaffoldResearchProject(workspace, { name: 'Porous combustion' })
 check('scaffold reports success', report.ok === true)
-check('project name is taken from the option', report.project === 'Пористое горение', report.project)
+check('project name is taken from the option', report.project === 'Porous combustion', report.project)
 
 for (const folder of ['literature', 'literature/notes', 'hypotheses', 'models', 'runs', 'data/raw', 'data/derived', 'analysis/scripts', 'analysis/figures', 'analysis/tables', 'paper/sections', 'paper/figures', 'talks', 'admin']) {
   check(`folder ${folder}/ exists`, await exists(join(workspace, folder)))
@@ -49,23 +49,23 @@ for (const file of ['AGENTS.md', 'README.md', 'PROJECT.md', 'literature/README.m
 
 const agents = await readFile(join(workspace, 'AGENTS.md'), 'utf8')
 check('AGENTS.md states the journal discipline', agents.includes('hypothesis') && agents.includes('observation') && agents.includes('data/raw'))
-check('AGENTS.md forbids rewriting raw data', /не переписывай/i.test(agents))
-check('AGENTS.md forbids fabricating paths and numbers', agents.includes('Не выдумывай') && agents.includes('Проверка вместо догадки') && agents.includes('лежит в…'))
-check('AGENTS.md requires scripted computation', agents.includes('Считает скрипт') && agents.includes('analysis/scripts/'))
+check('AGENTS.md forbids rewriting raw data', /never rewrite/i.test(agents))
+check('AGENTS.md forbids fabricating paths and numbers', agents.includes('Do not invent') && agents.includes('Verification instead of guessing') && agents.includes('lives in…'))
+check('AGENTS.md requires scripted computation', agents.includes('Scripts do the arithmetic') && agents.includes('analysis/scripts/'))
 const analysisRules = await readFile(join(workspace, 'analysis/README.md'), 'utf8')
-check('analysis rules repeat the script rule', /считает скрипт/i.test(analysisRules))
+check('analysis rules repeat the script rule', /computed by a script/i.test(analysisRules))
 const brief = await readFile(join(workspace, 'PROJECT.md'), 'utf8')
-check('PROJECT.md is a form with the success criterion', brief.includes('Что считаем успехом') && brief.includes('Пористое горение'))
+check('PROJECT.md is a form with the success criterion', brief.includes('What counts as success') && brief.includes('Porous combustion'))
 const protocol = await readFile(join(workspace, 'runs/README.md'), 'utf8')
 check('run protocol names the mandatory files', protocol.includes('run.md') && protocol.includes('conclusion.md'))
 const policy = JSON.parse(await readFile(join(workspace, '.dsh/policy.json'), 'utf8'))
 check('policy protects raw data', policy.protectedPaths.includes('data/raw/**'))
 const marker = JSON.parse(await readFile(join(workspace, '.dsh/research-project.json'), 'utf8'))
-check('marker identifies a research project', marker.kind === 'research-project' && marker.name === 'Пористое горение')
+check('marker identifies a research project', marker.kind === 'research-project' && marker.name === 'Porous combustion')
 check('marker lists the folders with purposes', Array.isArray(marker.folders) && marker.folders.some((entry) => entry.path === 'runs' && typeof entry.purpose === 'string'))
 
 // --- 2. a second run keeps the work -----------------------------------------
-const edited = `${brief.trimEnd()}\n\nПравка владельца.\n`
+const edited = `${brief.trimEnd()}\n\nOwner edit.\n`
 await import('node:fs/promises').then((fs) => fs.writeFile(join(workspace, 'PROJECT.md'), edited, 'utf8'))
 const second = await scaffold.scaffoldResearchProject(workspace, {})
 check('second run keeps an edited form', (await readFile(join(workspace, 'PROJECT.md'), 'utf8')) === edited)
@@ -93,24 +93,24 @@ check('tool research_init is registered', tools.has('research_init'))
 check('command research-init is registered', handlers.has('research-init'))
 
 const toolReport = await tools.get('research_init').execute(
-  { brief: 'Как влияет пористость на скорость ламинарного пламени?' },
+  { brief: 'How does porosity affect the laminar flame speed?' },
   { agent: { id: 'agent-1' }, callId: 'call-1', name: 'research_init', arguments: {} },
 )
 check('tool report names the project', toolReport.ok === true && typeof toolReport.project === 'string')
-check('brief is appended to PROJECT.md', /влияет пористость/i.test(await readFile(join(workspace, 'PROJECT.md'), 'utf8')))
+check('brief is appended to PROJECT.md', /porosity affect/i.test(await readFile(join(workspace, 'PROJECT.md'), 'utf8')))
 
 const rendered = tools.get('research_init').output.render({}, toolReport)
 check('tool renders a readable summary', String(rendered[0]?.text ?? '').includes('research project ready'))
 
 const commandResult = await handlers.get('research-init').handler({ agent: { id: 'agent-1' }, rawInput: '', signal: undefined, attachments: [], commandId: 'c-1' })
-check('command returns a success result', commandResult.kind === 'success' && commandResult.text.includes('научный проект'), JSON.stringify(commandResult).slice(0, 120))
+check('command returns a success result', commandResult.kind === 'success' && commandResult.text.includes('research project'), JSON.stringify(commandResult).slice(0, 120))
 
 const identity = sections.find((section) => section.name === 'research-project-identity')
 check('prompt section research-project-identity is registered', identity !== undefined)
 const identityText = identity.text({ agent: { id: 'agent-1' } })
-check('prompt announces the research project', identityText.includes('исследовательский проект') && identityText.includes('Пористое горение'), identityText.slice(0, 120))
+check('prompt announces the research project', identityText.includes('research project') && identityText.includes('Porous combustion'), identityText.slice(0, 120))
 check('prompt names the journal discipline', identityText.includes('observation') && identityText.includes('PROJECT.md'))
-check('prompt forbids fabrication and hand arithmetic', identityText.includes('не выдумывать') && identityText.includes('analysis/scripts/'))
+check('prompt forbids fabrication and hand arithmetic', identityText.includes('do not invent') && identityText.includes('analysis/scripts/'))
 check('a foreign workspace gets no identity', identity.text({ agent: { id: 'unknown' } }) === '')
 
 // the scaffold leaves a journal note, so the project's first record is not empty

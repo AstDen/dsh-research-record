@@ -77,7 +77,7 @@ export function planLayout({ panels, arrangement = 'row', widthMm, extraLegendMm
 
 function renderPlan(plan, language = 'ru') {
   const letters = GEOMETRY.letters[language] ?? GEOMETRY.letters.en
-  const list = plan.letters ? `да — ${letters.slice(0, plan.nrows * plan.ncols).join(', ')}` : 'нет (одна панель буквы не получает)'
+  const list = plan.letters ? `yes — ${letters.slice(0, plan.nrows * plan.ncols).join(', ')}` : 'no (a single panel gets no letter)'
   return [
     `Sheet: ${plan.widthMm} × ${plan.heightMm} mm`,
     `  = ${mmToPt(plan.widthMm).toFixed(3)} × ${mmToPt(plan.heightMm).toFixed(3)} pt (so pdfinfo shows these numbers)`,

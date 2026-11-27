@@ -37,19 +37,19 @@ function check(label, condition, detail = '') {
 
 async function buildTree(root) {
   const files = [
-    ['прогоны/2023_09_вар1/results/dpdx.csv', 'u,dpdx_darcy,dpdx_inertial\n0.01,12.4,0.3\n0.02,24.8,1.2\n'],
-    ['прогоны/2023_09_вар1/log/solver.log', 'Time = 0.01\nCdi = 0.41\n'],
-    ['прогоны/2023_09_вар1/README.md', '# Вар1\n'],
-    ['статьи/draft_v2/main.tex', '\\documentclass{article}\n\\title{Ламинарный поток в пористой трубе}\n\\begin{document}\n\\end{document}\n'],
-    ['статьи/draft_v2/figures/figure1.png', Buffer.from([0x89, 0x50, 0x4e, 0x47])],
-    ['литература/refs/galowin1974.pdf', Buffer.from('%PDF-1.4 fake')],
-    ['литература/refs/library.bib', '@article{galowin1974,\n title={X}\n}\n'],
+    ['runs/2023_09_run1/results/dpdx.csv', 'u,dpdx_darcy,dpdx_inertial\n0.01,12.4,0.3\n0.02,24.8,1.2\n'],
+    ['runs/2023_09_run1/log/solver.log', 'Time = 0.01\nCdi = 0.41\n'],
+    ['runs/2023_09_run1/README.md', '# Run 1\n'],
+    ['papers/draft_v2/main.tex', '\\documentclass{article}\n\\title{Laminar flow in a porous tube}\n\\begin{document}\n\\end{document}\n'],
+    ['papers/draft_v2/figures/figure1.png', Buffer.from([0x89, 0x50, 0x4e, 0x47])],
+    ['literature/refs/galowin1974.pdf', Buffer.from('%PDF-1.4 fake')],
+    ['literature/refs/library.bib', '@article{galowin1974,\n title={X}\n}\n'],
     ['analysis/scratch.ipynb', '{"cells":[{"cell_type":"markdown"},{"cell_type":"code"}],"metadata":{}}'],
     ['data/raw/tomo/slice_001.tif', Buffer.from([1, 2, 3])],
     ['data/raw/tomo/slice_002.tif', Buffer.from([4, 5, 6])],
     ['models/mesh_1mm.msh', 'fake mesh\n'],
-    ['пусто_потом', null],
-    ['архив/old_results.zip', Buffer.from([1, 2, 3, 4])],
+    ['empty_later', null],
+    ['archive/old_results.zip', Buffer.from([1, 2, 3, 4])],
     ['scripts/post.py', 'print("x")\n'],
   ]
   for (const [path, content] of files) {
@@ -74,8 +74,8 @@ check('walk counts files', summary.files === 13, String(summary.files))
 check('no marker written by default', (await readdir(project)).includes('.dsh-map.json') === false)
 check('run-like directory detected', summary.notable.runLike.some((path) => path.includes('2023_09')), summary.notable.runLike.join(','))
 check('paper-like directory detected', summary.notable.paperLike.some((path) => path.includes('draft_v2')), summary.notable.paperLike.join(','))
-check('literature directory detected', summary.notable.literatureLike.some((path) => path.includes('литература')), summary.notable.literatureLike.join(','))
-check('empty directory detected', summary.notable.empty.some((path) => path.includes('пусто_потом')), summary.notable.empty.join(','))
+check('literature directory detected', summary.notable.literatureLike.some((path) => path.includes('literature')), summary.notable.literatureLike.join(','))
+check('empty directory detected', summary.notable.empty.some((path) => path.includes('empty_later')), summary.notable.empty.join(','))
 check('kinds counted', summary.byKind.table === 1 && summary.byKind.pdf === 1 && summary.byKind.tex === 1 && summary.byKind.notebook === 1,
   JSON.stringify(summary.byKind))
 check('a .bib is a bibliography, not an unknown', summary.byKind.bib === 1, JSON.stringify(summary.byKind))
@@ -83,18 +83,18 @@ check('figure png and two tif images are images', summary.byKind.image === 3, JS
 check('mesh classified as mesh, not binary', summary.byKind.mesh === 1, JSON.stringify(summary.byKind))
 
 const mapText = renderMap(map, summary)
-check('map has the header', mapText.includes('Карта проекта'))
-check('map shows the tree', mapText.includes('прогоны/') && mapText.includes('литература/'))
-check('map reports volume', /объём:/.test(mapText))
+check('map has the header', mapText.includes('Project map'))
+check('map shows the tree', mapText.includes('runs/') && mapText.includes('literature/'))
+check('map reports volume', /volume:/.test(mapText))
 
 // --- facts -----------------------------------------------------------------
 const facts = await extractFacts(project, map)
 const table = facts.find((fact) => fact.path.endsWith('dpdx.csv'))
 check('csv columns extracted', table !== undefined && table.text.includes('u') && table.text.includes('dpdx_darcy'), table?.text)
 const tex = facts.find((fact) => fact.path.endsWith('main.tex'))
-check('latex title extracted', tex !== undefined && tex.text.includes('Ламинарный поток'), tex?.text)
+check('latex title extracted', tex !== undefined && tex.text.includes('Laminar flow'), tex?.text)
 const notebook = facts.find((fact) => fact.path.endsWith('.ipynb'))
-check('notebook cell count', notebook !== undefined && /ячеек/.test(notebook.text), notebook?.text)
+check('notebook cell count', notebook !== undefined && /cells at the start/.test(notebook.text), notebook?.text)
 check('pdf recorded as a fact without parsing', facts.some((fact) => fact.kind === 'pdf' && fact.path.endsWith('galowin1974.pdf')))
 check('fact limit respected', facts.length <= 40)
 
@@ -108,42 +108,42 @@ check('every create carries a reason', asIs.creates.every((item) => typeof item 
 check('as-is keeps everything', asIs.keeps.length > 0 && asIs.moves.length === 0)
 check('light adds standard folders', light.creates.some((item) => createPath(item).startsWith('literature/')))
 check('light moves nothing', light.moves.length === 0)
-check('light keeps the existing literature folder', light.keeps.some((item) => item.includes('литература')), light.keeps.join('|'))
+check('light keeps the existing literature folder', light.keeps.some((item) => item.includes('literature')), light.keeps.join('|'))
 check('restructure lists candidate moves', restructure.moves.length >= 4, String(restructure.moves.length))
-check('restructure never proposes moving archives', restructure.keeps.some((item) => item.includes('архив')), restructure.keeps.join('|'))
+check('restructure never proposes moving archives', restructure.keeps.some((item) => item.includes('archives')), restructure.keeps.join('|'))
 check('restructure protects raw data', restructure.keeps.some((item) => item.includes('data/raw')))
 check('every plan asks the owner something', asIs.questions.length > 0 && light.questions.length > 0 && restructure.questions.length > 0)
 
 const journal = renderArchivalJournal({ map, summary, facts, plans: [asIs, light, restructure], root: project })
-check('journal separates facts from guesses', journal.includes('## 2. Факты') && journal.includes('## 3. Оценки'))
-check('journal contains the map section', journal.includes('## 1. Карта'))
-check('journal lists all three plans', journal.includes('Встроиться как есть') && journal.includes('Встроиться легко') && journal.includes('Перестроить'))
-check('journal ends with questions for the owner', journal.includes('## 6. Что спросить у владельца'))
-check('journal does not call the project bad', !/плохом состоянии/.test(journal))
+check('journal separates facts from guesses', journal.includes('## 2. Facts') && journal.includes('## 3. Guesses'))
+check('journal contains the map section', journal.includes('## 1. Map'))
+check('journal lists all three plans', journal.includes('Fit in as is') && journal.includes('Fit in lightly') && journal.includes('Restructure'))
+check('journal ends with questions for the owner', journal.includes('## 6. What to ask the owner'))
+check('journal does not call the project bad', !/in bad shape/.test(journal))
 
 // --- plan-only adopt writes nothing outside .dsh --------------------------
 const dry = await adoptProject(workspace, { root: project, mode: 'light' })
 check('dry run writes no map file', (await readdir(join(workspace, '.dsh', 'map')).catch(() => [])).includes('map.md') === false)
 check('dry run creates no standard folders', (await readdir(project)).includes('hypotheses') === false)
-check('dry run still plans', dry.plans.length === 3 && dry.planText.includes('Встроиться легко'))
+check('dry run still plans', dry.plans.length === 3 && dry.planText.includes('Fit in lightly'))
 
 // --- apply: additive only -------------------------------------------------
 const before = new Map()
-for (const path of ['прогоны/2023_09_вар1/results/dpdx.csv', 'статьи/draft_v2/main.tex', 'data/raw/tomo/slice_001.tif']) {
+for (const path of ['runs/2023_09_run1/results/dpdx.csv', 'papers/draft_v2/main.tex', 'data/raw/tomo/slice_001.tif']) {
   before.set(path, (await stat(join(project, path))).mtimeMs)
 }
 const applied = await adoptProject(workspace, { root: project, mode: 'light', apply: true })
 check('apply writes the map', applied.created.some((item) => item.endsWith('.dsh/map/map.md')), applied.created.join('|'))
 check('apply writes the tree json', applied.created.some((item) => item.endsWith('tree.json')))
-check('apply writes the archival journal', (await readFile(join(workspace, '.dsh', 'map', 'archival-journal.md'), 'utf8')).includes('Архивный лабораторный журнал'))
+check('apply writes the archival journal', (await readFile(join(workspace, '.dsh', 'map', 'archival-journal.md'), 'utf8')).includes('Archival lab journal'))
 check('apply creates policy', JSON.parse(await readFile(join(workspace, '.dsh', 'policy.json'), 'utf8')).protectedPaths.length > 0)
 check('apply writes an AGENTS pointer', (await readFile(join(project, 'AGENTS.md'), 'utf8')).includes('.dsh/map/'))
 check('light creates standard folders', (await readdir(project)).includes('hypotheses') && (await readdir(project)).includes('paper'))
-check('light writes the index', (await readFile(join(project, 'literature', '_INDEX.md'), 'utf8')).includes('Файлы не перемещались'))
+check('light writes the index', (await readFile(join(project, 'literature', '_INDEX.md'), 'utf8')).includes('No files were moved'))
 for (const [path, mtime] of before) {
   check(`apply leaves ${path} untouched`, (await stat(join(project, path))).mtimeMs === mtime)
 }
-check('apply does not delete the archive', (await stat(join(project, 'архив', 'old_results.zip'))).size === 4)
+check('apply does not delete the archive', (await stat(join(project, 'archive', 'old_results.zip'))).size === 4)
 
 // --- as-is apply keeps the tree pristine ----------------------------------
 const project2 = join(workspace, 'second_project')
@@ -207,7 +207,7 @@ const bigMap = fixtures.mixed.map
 const bigSummary = { ...fixtures.mixed.summary, notable: { ...fixtures.mixed.summary.notable, runLike: Array.from({ length: 500 }, (_, i) => `run_${i}/`) } }
 const bigJournal = renderArchivalJournal({ map: bigMap, summary: bigSummary, facts: [], plans: [fixtures.mixed.light], root: 'fixture' })
 check('journal obeys the 64 KB budget', bigJournal.length <= 64_500, String(bigJournal.length))
-check('trimmed journal says it was trimmed', bigJournal.includes('сокращён по бюджету') || bigJournal.length <= 64_000)
+check('trimmed journal says it was trimmed', bigJournal.includes('trimmed to the') || bigJournal.length <= 64_000)
 
 console.log(`\nadoption: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exitCode = 1

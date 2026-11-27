@@ -12,9 +12,9 @@
  * with these columns, a PDF, a LaTeX manuscript, a notebook with N cells), and
  * writes an archival journal that separates three different kinds of statement:
  *
- *   факт   — what is in the directory, with the path as evidence;
- *   оценка — what it probably is (a draft, an abandoned run), marked as a guess;
- *   план   — how to fit in, in one of three modes, strongest fit first.
+ *   fact  — what is in the directory, with the path as evidence;
+ *   guess — what it probably is (a draft, an abandoned run), marked as such;
+ *   plan  — how to fit in, in one of three modes, strongest fit first.
  *
  * Nothing is moved, renamed or deleted. The adoption plan lists candidate moves
  * and the model performs them one at a time with the user's approval, because
@@ -66,9 +66,9 @@ export function kindOf(fileName, extensions = EXTENSION_KIND) {
   return extensions.get(extension) ?? 'other'
 }
 
-const RUN_PATTERN = /(^|[^a-z])(run|case|task|exp|experiment|вариант|вар|прогон|test)[-_ .]?\d*/i
-const PAPER_PATTERN = /(paper|article|manuscript|draft|статья|статьи|рукопись|thesis|диссертац)/i
-const LIT_PATTERN = /(literature|refs?|bibliograph|обзор|литератур|источник)/i
+const RUN_PATTERN = /(^|[^a-z])(run|case|task|exp|experiment|test)[-_ .]?\d*/i
+const PAPER_PATTERN = /(paper|article|manuscript|draft|thesis)/i
+const LIT_PATTERN = /(literature|refs?|bibliograph)/i
 
 export function classifyTree() {
   return Object.keys(KINDS)
@@ -323,30 +323,30 @@ export async function extractFacts(root, map, { maxFacts = 40 } = {}) {
         const header = head.split('\n')[0]?.trim() ?? ''
         if (header.length > 0) {
           const columns = header.split(/[,;\t]/).map((cell) => cell.trim().replace(/^"|"$/g, ''))
-          facts.push({ kind: 'table', path, text: `таблица с колонками: ${columns.slice(0, 8).join(', ')}${columns.length > 8 ? `, … (${columns.length} колонок)` : ''}` })
+          facts.push({ kind: 'table', path, text: `table with columns: ${columns.slice(0, 8).join(', ')}${columns.length > 8 ? `, … (${columns.length} columns)` : ''}` })
         }
       } else if (kind === 'table' && /\.(xlsx|xls|ods)$/i.test(sample)) {
-        facts.push({ kind: 'table', path, text: 'книга таблиц (xlsx) — колонки не читались, открой через data_profile' })
+        facts.push({ kind: 'table', path, text: 'spreadsheet workbook (xlsx) — columns not read, open it with data_profile' })
       } else if (kind === 'tex' && /\.tex$/i.test(sample)) {
         const head = await readHead(join(directory, sample), 4000)
         const title = head.match(/\\title\{([^}]{3,120})\}/)?.[1]
-        facts.push({ kind: 'tex', path, text: title === undefined ? 'LaTeX-файл (без \\title)' : `LaTeX-файл, заголовок: «${title}»` })
+        facts.push({ kind: 'tex', path, text: title === undefined ? 'LaTeX file (no \\title)' : `LaTeX file, title: "${title}"` })
       } else if (kind === 'notebook') {
         const head = await readHead(join(directory, sample), 200_000)
         const cells = (head.match(/"cell_type"/g) ?? []).length
-        facts.push({ kind: 'notebook', path, text: `Jupyter-ноутбук, ячеек в начале файла: ${cells}` })
+        facts.push({ kind: 'notebook', path, text: `Jupyter notebook, cells at the start of the file: ${cells}` })
       } else if (kind === 'pdf') {
-        facts.push({ kind: 'pdf', path, text: 'PDF (страницы и текст — через pdf_info)' })
+        facts.push({ kind: 'pdf', path, text: 'PDF (pages and text via pdf_info)' })
       } else if (kind === 'image') {
-        facts.push({ kind: 'image', path, text: 'изображение/рисунок' })
+        facts.push({ kind: 'image', path, text: 'image/figure' })
       } else if (kind === 'mesh') {
-        facts.push({ kind: 'mesh', path, text: 'сетка/расчётный файл (msh, stl, cas/dat, trn)' })
+        facts.push({ kind: 'mesh', path, text: 'mesh/solver file (msh, stl, cas/dat, trn)' })
       } else if (kind === 'archive') {
-        facts.push({ kind: 'archive', path, text: 'архив — содержимое не распаковано' })
+        facts.push({ kind: 'archive', path, text: 'archive — contents not unpacked' })
       } else if (kind === 'binary') {
-        facts.push({ kind: 'binary', path, text: 'двоичные данные (h5/npy/vtk)' })
+        facts.push({ kind: 'binary', path, text: 'binary data (h5/npy/vtk)' })
       } else if (kind === 'code') {
-        facts.push({ kind: 'code', path, text: 'скрипт' })
+        facts.push({ kind: 'code', path, text: 'script' })
       }
     }
   }
@@ -389,8 +389,8 @@ export function summarizeMap(map) {
 }
 
 function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} Б`
-  const units = ['КБ', 'МБ', 'ГБ', 'ТБ']
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
   let value = bytes / 1024
   let index = 0
   while (value >= 1024 && index < units.length - 1) {
@@ -402,33 +402,33 @@ function formatBytes(bytes) {
 
 export function renderMap(map, summary) {
   const lines = []
-  lines.push(`# Карта проекта: ${basename(map.root)}`)
+  lines.push(`# Project map: ${basename(map.root)}`)
   lines.push('')
-  lines.push(`Каталогов: ${summary.directories} · файлов: ${summary.files} · объём: ${formatBytes(summary.bytes)} · глубина: ${summary.depthReached}` +
-    (summary.truncated ? ' · ВНИМАНИЕ: обход остановлен по лимиту' : ''))
-  if (summary.skipped > 0) lines.push(`Не прочитано каталогов: ${summary.skipped}`)
+  lines.push(`Directories: ${summary.directories} · files: ${summary.files} · volume: ${formatBytes(summary.bytes)} · depth: ${summary.depthReached}` +
+    (summary.truncated ? ' · WARNING: the walk stopped at the limit' : ''))
+  if (summary.skipped > 0) lines.push(`Directories not read: ${summary.skipped}`)
   lines.push('')
-  lines.push('## Что в дереве по типам')
+  lines.push('## What the tree holds, by kind')
   for (const [kind, count] of Object.entries(summary.byKind).sort((left, right) => right[1] - left[1])) {
     lines.push(`- ${kind}: ${count}`)
   }
   lines.push('')
-  lines.push('## Домен (по признакам, а не по названию)')
+  lines.push('## Domain (from evidence, not from names)')
   if (summary.packs.length === 0) {
-    lines.push('- домен не определён: признаков ниже 5 % — далее работает только универсальный словарь ролей')
+    lines.push('- domain not determined: every signature is below 5 % — from here only the universal role vocabulary applies')
   } else {
     for (const hit of summary.packs) {
-      lines.push(`- ${hit.id} — ${Math.round(hit.share * 100)} % файлов (${hit.evidence.join(', ')})`)
+      lines.push(`- ${hit.id} — ${Math.round(hit.share * 100)} % of files (${hit.evidence.join(', ')})`)
     }
   }
   lines.push('')
-  lines.push('## Роли каталогов')
+  lines.push('## Directory roles')
   for (const [role, count] of Object.entries(summary.roles).sort((left, right) => right[1] - left[1])) {
     const examples = map.nodes.filter((node) => (node.role ?? 'mixed') === role).slice(0, 4).map((node) => (node.path === '.' ? '.' : node.path))
     lines.push(`- ${role}: ${count}${examples.length > 0 ? ` — ${examples.join(', ')}` : ''}`)
   }
   lines.push('')
-  lines.push('## Дерево')
+  lines.push('## Tree')
   for (const node of map.nodes) {
     const indent = '  '.repeat(Math.min(node.depth, 8))
     const icons = []
@@ -436,7 +436,7 @@ export function renderMap(map, summary) {
     if (dominant !== undefined && node.files > 0) icons.push(dominant[0])
     const marks = node.signature.filter((tag) => tag !== `mostly-${dominant?.[0]}`)
     const name = node.path === '.' ? '.' : basename(node.path)
-    lines.push(`${indent}${name}/  ${node.files}ф${node.bytes > 0 ? ` ${formatBytes(node.bytes)}` : ''}` +
+    lines.push(`${indent}${name}/  ${node.files} files${node.bytes > 0 ? ` ${formatBytes(node.bytes)}` : ''}` +
       `${icons.length > 0 ? ` [${icons.join(',')}]` : ''}` +
       `${node.role !== undefined ? ` {${node.role}}` : ''}` +
       `${marks.length > 0 ? ` (${marks.join(', ')})` : ''}`)
@@ -444,14 +444,14 @@ export function renderMap(map, summary) {
   }
   if (summary.notable.empty.length > 0) {
     lines.push('')
-    lines.push(`Пустые каталоги (${summary.notable.empty.length}): ${summary.notable.empty.slice(0, 10).join(', ')}`)
+    lines.push(`Empty directories (${summary.notable.empty.length}): ${summary.notable.empty.slice(0, 10).join(', ')}`)
   }
   if (summary.unknownNames.length > 0) {
     lines.push('')
-    lines.push('## Что не опознано (кандидаты в пак своей области)')
+    lines.push('## What was not recognised (candidates for a pack of your field)')
     lines.push(summary.unknownNames.slice(0, 15).map((item) => `${item.name} ×${item.count}`).join(' · '))
     lines.push('')
-    lines.push(`Если это важные файлы, добавь соответствие в \`<проект>/.dsh/packs/*.json\` — код менять не нужно.`)
+    lines.push(`If these files matter, add a mapping in \`<project>/.dsh/packs/*.json\` — no code change needed.`)
   }
   return lines.join('\n')
 }
@@ -476,31 +476,31 @@ export function planAdoption(map, summary, { mode = 'light' } = {}) {
     .filter((node) => node.path !== '.' && ['run', 'paper', 'literature'].includes(node.role) && (node.subtreeFiles ?? 0) > 0)
     .sort((left, right) => (right.subtreeFiles ?? 0) - (left.subtreeFiles ?? 0))
   const KEEP_LIMIT = 12
-  const capped = (list) => (list.length <= KEEP_LIMIT ? list : [...list.slice(0, KEEP_LIMIT), `… ещё ${list.length - KEEP_LIMIT} каталогов — полный список в plan-${mode}.json`])
+  const capped = (list) => (list.length <= KEEP_LIMIT ? list : [...list.slice(0, KEEP_LIMIT), `… ${list.length - KEEP_LIMIT} more directories — the full list is in plan-${mode}.json`])
   const create = (path, reason) => plan.creates.push({ path, reason })
 
   if (mode === 'as-is') {
-    create('.dsh/map/', 'карта, архивный журнал, снимок путей')
-    create('AGENTS.md', 'указатель на карту, если файла ещё нет')
-    create('.dsh/policy.json', 'защита сырых данных')
-    plan.keeps.push('вся существующая структура остаётся как есть; стандартные папки не создаются')
-    plan.questions.push('какие каталоги считать «в работе» — по ним строится индекс, ничего не перемещается')
+    create('.dsh/map/', 'map, archival journal, snapshot of paths')
+    create('AGENTS.md', 'pointer to the map, if the file does not exist yet')
+    create('.dsh/policy.json', 'protection for raw data')
+    plan.keeps.push('the whole existing structure stays as it is; no standard folders are created')
+    plan.questions.push('which directories count as "in progress" — the index is built from them, nothing is moved')
     return plan
   }
 
   if (work.length > 0) {
-    for (const line of capped(work.map((node) => `${node.path}/ — ${node.role} (${node.roleReason ?? 'признак не записан'})`))) plan.keeps.push(line)
+    for (const line of capped(work.map((node) => `${node.path}/ — ${node.role} (${node.roleReason ?? 'reason not recorded'})`))) plan.keeps.push(line)
   }
   if (mode === 'light') {
     for (const entry of skeleton) {
       const top = entry.path.includes('/') ? entry.path.slice(0, entry.path.indexOf('/')) : entry.path
-      if (present.has(top.toLowerCase()) && entry.path === top) plan.keeps.push(`${top}/ уже есть — не трогаем`)
+      if (present.has(top.toLowerCase()) && entry.path === top) plan.keeps.push(`${top}/ already exists — left alone`)
       else create(entry.path, entry.reason)
     }
-    create('.dsh/map/', 'карта, архивный журнал, снимок путей')
-    create('.dsh/policy.json', 'защита сырых данных')
-    create('AGENTS.md', 'указатель на карту, если файла ещё нет')
-    plan.questions.push('какие из существующих каталогов — текущая работа, а какие архив')
+    create('.dsh/map/', 'map, archival journal, snapshot of paths')
+    create('.dsh/policy.json', 'protection for raw data')
+    create('AGENTS.md', 'pointer to the map, if the file does not exist yet')
+    plan.questions.push('which existing directories are current work and which are archive')
     return plan
   }
 
@@ -517,52 +517,52 @@ export function planAdoption(map, summary, { mode = 'light' } = {}) {
   const stamp = new Date().toISOString().slice(0, 10)
   plan.archive = `archive/${stamp}/`
   for (const entry of skeleton) create(entry.path, entry.reason)
-  create('.dsh/map/', 'карта, архивный журнал, снимок путей')
-  create('.dsh/policy.json', 'защита сырых данных')
-  plan.moves.push({ from: '—', to: 'literature/refs/', what: 'PDF и .bib из literature-каталогов', count: buckets.pdfs, requiresApproval: true })
-  plan.moves.push({ from: '—', to: 'runs/<id>/results/', what: 'таблицы и логи из run-каталогов', count: buckets.tables, requiresApproval: true })
-  plan.moves.push({ from: '—', to: 'analysis/figures/', what: 'рисунки, созданные скриптом', count: buckets.images, requiresApproval: true })
-  plan.moves.push({ from: '—', to: 'paper/', what: 'LaTeX и черновики', count: buckets.tex, requiresApproval: true })
-  plan.moves.push({ from: '—', to: 'models/', what: 'сетки и геометрия', count: buckets.meshes, requiresApproval: true })
-  plan.moves.push({ from: '—', to: `${plan.archive}`, what: 'снимок путей и хешей (не копия файлов), чтобы вернуть всё назад', count: buckets.fields, requiresApproval: false })
-  plan.keeps.push('сырые данные не перемещаются: data/raw/** под защитой, работа идёт на копиях')
-  plan.keeps.push('архивы (.zip/.tar) остаются на месте, пока владелец не скажет, что внутри')
-  plan.questions.push('по какому признаку отличать «текущую работу» от «брошенного» — дата, README, наличие статьи?')
-  plan.questions.push('что из результатов опубликовано и не должно двигаться')
+  create('.dsh/map/', 'map, archival journal, snapshot of paths')
+  create('.dsh/policy.json', 'protection for raw data')
+  plan.moves.push({ from: '—', to: 'literature/refs/', what: 'PDFs and .bib from literature directories', count: buckets.pdfs, requiresApproval: true })
+  plan.moves.push({ from: '—', to: 'runs/<id>/results/', what: 'tables and logs from run directories', count: buckets.tables, requiresApproval: true })
+  plan.moves.push({ from: '—', to: 'analysis/figures/', what: 'figures produced by a script', count: buckets.images, requiresApproval: true })
+  plan.moves.push({ from: '—', to: 'paper/', what: 'LaTeX and drafts', count: buckets.tex, requiresApproval: true })
+  plan.moves.push({ from: '—', to: 'models/', what: 'meshes and geometry', count: buckets.meshes, requiresApproval: true })
+  plan.moves.push({ from: '—', to: `${plan.archive}`, what: 'snapshot of paths and hashes (not a copy of the files), so everything can be put back', count: buckets.fields, requiresApproval: false })
+  plan.keeps.push('raw data is not moved: data/raw/** is protected, work happens on copies')
+  plan.keeps.push('archives (.zip/.tar) stay where they are until the owner says what is inside')
+  plan.questions.push('by what sign to tell "current work" from "abandoned" — date, README, the presence of a paper?')
+  plan.questions.push('which results are published and must not move')
   return plan
 }
 
 export function renderPlan(plan, summary) {
   const lines = []
   const titles = {
-    'as-is': 'Встроиться как есть (ничего не переделывать)',
-    light: 'Встроиться легко (добавить рядом, не перемещая)',
-    restructure: 'Перестроить (план перемещений, по одному с подтверждением)',
+    'as-is': 'Fit in as is (change nothing)',
+    light: 'Fit in lightly (add alongside, move nothing)',
+    restructure: 'Restructure (a move plan, one item at a time with confirmation)',
   }
-  lines.push(`## Режим: ${titles[plan.mode] ?? plan.mode}`)
+  lines.push(`## Mode: ${titles[plan.mode] ?? plan.mode}`)
   if ((plan.domain ?? []).length > 0) {
-    lines.push(`Домен: ${plan.domain.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} %`).join(', ')}`)
+    lines.push(`Domain: ${plan.domain.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} %`).join(', ')}`)
   }
   if (plan.creates.length > 0) {
-    lines.push('Создать:')
+    lines.push('Create:')
     for (const item of plan.creates) {
       if (typeof item === 'string') lines.push(`  + ${item}`)
       else lines.push(`  + ${item.path}  — ${item.reason}`)
     }
   }
   if (plan.moves.length > 0) {
-    lines.push('Кандидаты на перенос (только с подтверждением владельца):')
-    for (const move of plan.moves) lines.push(`  → ${move.to}  ${move.what}  (${move.count} файлов)`)
+    lines.push('Candidates to move (owner confirmation only):')
+    for (const move of plan.moves) lines.push(`  → ${move.to}  ${move.what}  (${move.count} files)`)
   }
   if (plan.keeps.length > 0) {
-    lines.push('Не трогаем:')
+    lines.push('Left untouched:')
     for (const item of plan.keeps) lines.push(`  · ${item}`)
   }
   if (plan.questions.length > 0) {
-    lines.push('Спросить владельца:')
+    lines.push('Ask the owner:')
     for (const item of plan.questions) lines.push(`  ? ${item}`)
   }
-  if (summary.truncated) lines.push('', 'ВНИМАНИЕ: дерево обойдено не полностью — план предварительный.')
+  if (summary.truncated) lines.push('', 'WARNING: the tree was not walked completely — this plan is preliminary.')
   return lines.join('\n')
 }
 
@@ -570,77 +570,77 @@ const JOURNAL_CAP = 64_000
 
 export function renderArchivalJournal({ map, summary, facts, plans, root }) {
   const lines = []
-  lines.push(`# Архивный лабораторный журнал · ${basename(root)}`)
+  lines.push(`# Archival lab journal · ${basename(root)}`)
   lines.push('')
-  lines.push(`Составлен: ${new Date().toISOString().slice(0, 10)} · прочитано каталогов ${summary.directories}, файлов ${summary.files}`)
+  lines.push(`Compiled: ${new Date().toISOString().slice(0, 10)} · directories read ${summary.directories}, files ${summary.files}`)
   lines.push('')
-  lines.push('Три вида утверждений, которые здесь разделены намеренно: **факт** — то, что')
-  lines.push('подтверждается файлом и путём к нему; **оценка** — догадка о смысле, помечена;')
-  lines.push('**план** — что сделать со структурой. Оценки не превращаются в факты без проверки.')
+  lines.push('Three kinds of statement, kept apart on purpose: **fact** — what a file and')
+  lines.push('its path prove; **guess** — a reading of the meaning, marked as such;')
+  lines.push('**plan** — what to do with the structure. Guesses do not become facts without a check.')
   lines.push('')
-  lines.push('## 1. Карта')
+  lines.push('## 1. Map')
   lines.push('')
-  lines.push(`См. \`${MAP_MD}\` рядом (полное дерево) и \`${TREE_JSON}\` (машиночитаемые узлы).`)
+  lines.push(`See \`${MAP_MD}\` beside this file (the full tree) and \`${TREE_JSON}\` (machine-readable nodes).`)
   lines.push('')
-  lines.push(`- каталогов: ${summary.directories}, файлов: ${summary.files}, объём: ${formatBytes(summary.bytes)}`)
-  lines.push(`- по типам: ${Object.entries(summary.byKind).sort((left, right) => right[1] - left[1]).map(([kind, count]) => `${kind} ${count}`).join(' · ')}`)
+  lines.push(`- directories: ${summary.directories}, files: ${summary.files}, volume: ${formatBytes(summary.bytes)}`)
+  lines.push(`- by kind: ${Object.entries(summary.byKind).sort((left, right) => right[1] - left[1]).map(([kind, count]) => `${kind} ${count}`).join(' · ')}`)
   if ((summary.packs ?? []).length > 0) {
-    lines.push(`- домен: ${summary.packs.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} % (${hit.evidence.join(', ')})`).join(' · ')}`)
+    lines.push(`- domain: ${summary.packs.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} % (${hit.evidence.join(', ')})`).join(' · ')}`)
   } else {
-    lines.push('- домен не определён: признаков ниже 5 %, работает только универсальный словарь ролей')
+    lines.push('- domain not determined: every signature is below 5 %, only the universal role vocabulary applies')
   }
   const roleLine = Object.entries(summary.roles ?? {}).sort((left, right) => right[1] - left[1]).map(([role, count]) => `${role} ${count}`).join(' · ')
-  if (roleLine.length > 0) lines.push(`- роли каталогов: ${roleLine}`)
-  if ((summary.sniffed ?? 0) > 0) lines.push(`- опознано по первым байтам (не по расширению): ${summary.sniffed} файлов`)
+  if (roleLine.length > 0) lines.push(`- directory roles: ${roleLine}`)
+  if ((summary.sniffed ?? 0) > 0) lines.push(`- recognised from the first bytes (not the extension): ${summary.sniffed} files`)
   const runDirs = map.nodes.filter((node) => node.role === 'run').map((node) => node.path)
   const paperDirs = map.nodes.filter((node) => node.role === 'paper').map((node) => node.path)
   const litDirs = map.nodes.filter((node) => node.role === 'literature').map((node) => node.path)
-  if (runDirs.length > 0) lines.push(`- каталоги-прогоны (${runDirs.length}): ${runDirs.slice(0, 8).join(', ')}`)
-  if (paperDirs.length > 0) lines.push(`- каталоги со статьёй/черновиком (${paperDirs.length}): ${paperDirs.slice(0, 8).join(', ')}`)
-  if (litDirs.length > 0) lines.push(`- литература (${litDirs.length}): ${litDirs.slice(0, 8).join(', ')}`)
-  if (summary.notable.empty.length > 0) lines.push(`- пустые каталоги (${summary.notable.empty.length}): ${summary.notable.empty.slice(0, 8).join(', ')}`)
+  if (runDirs.length > 0) lines.push(`- run directories (${runDirs.length}): ${runDirs.slice(0, 8).join(', ')}`)
+  if (paperDirs.length > 0) lines.push(`- directories with a paper/draft (${paperDirs.length}): ${paperDirs.slice(0, 8).join(', ')}`)
+  if (litDirs.length > 0) lines.push(`- literature (${litDirs.length}): ${litDirs.slice(0, 8).join(', ')}`)
+  if (summary.notable.empty.length > 0) lines.push(`- empty directories (${summary.notable.empty.length}): ${summary.notable.empty.slice(0, 8).join(', ')}`)
   if ((summary.unknownNames ?? []).length > 0) {
-    lines.push(`- не опознано (топ-10): ${summary.unknownNames.slice(0, 10).map((item) => `${item.name} ×${item.count}`).join(' · ')}`)
+    lines.push(`- not recognised (top 10): ${summary.unknownNames.slice(0, 10).map((item) => `${item.name} ×${item.count}`).join(' · ')}`)
   }
   lines.push('')
-  lines.push('## 2. Факты (подтверждаются файлами)')
+  lines.push('## 2. Facts (proved by files)')
   lines.push('')
-  if (facts.length === 0) lines.push('- ничего не разобрано: в дереве нет файлов известных типов')
+  if (facts.length === 0) lines.push('- nothing parsed: the tree holds no files of a known kind')
   for (const fact of facts) lines.push(`- \`${fact.path}\` — ${fact.text}`)
   lines.push('')
-  lines.push('## 3. Оценки (догадки, требуют подтверждения владельцем)')
+  lines.push('## 3. Guesses (readings that need the owner to confirm)')
   lines.push('')
-  lines.push('- роль каталога выведена из состава файлов, а не из его названия: имя только повышает приоритет')
-  lines.push('- каталог-прогон обычно означает серию вариантов; какой из них итоговый — знает только владелец')
-  lines.push('- каталог со статьёй обычно содержит незаконченную рукопись; проверить дату и наличие рисунков')
-  lines.push('- «пустой каталог» может быть заготовкой, а может — потерянным результатом (проверить историю git)')
-  lines.push('- таблицы и рисунки без статьи и без журнала — типичный случай «сделано, но не описано»')
+  lines.push('- a directory role comes from the files inside it, not from its name: the name only raises priority')
+  lines.push('- a run directory usually means a series of variants; only the owner knows which one is final')
+  lines.push('- a directory with a paper usually holds an unfinished manuscript; check the date and whether figures are there')
+  lines.push('- an "empty directory" may be a placeholder or a lost result (check the git history)')
+  lines.push('- tables and figures without a paper or a journal are the typical "done but never written up" case')
   lines.push('')
-  lines.push('## 4. План встраивания')
+  lines.push('## 4. Plan for fitting in')
   lines.push('')
   for (const plan of plans) {
     lines.push(renderPlan(plan, summary))
     lines.push('')
   }
-  lines.push('## 5. Как переносить (если выбран третий режим)')
+  lines.push('## 5. How to move things (if the third mode is chosen)')
   lines.push('')
-  lines.push('1. Сначала снимок: `tree.json` уже содержит пути; хеши не нужны, чтобы вернуть всё назад.')
-  lines.push('2. Переносить по одному каталогу, с записью `decision` в журнал: что, откуда, куда и почему.')
-  lines.push('3. Сырые данные (`data/raw/**`) не двигать: они под защитой guard-а, работа — на копиях.')
-  lines.push('4. После каждого шага — `notebook_verify`, чтобы цепочка осталась целой.')
+  lines.push('1. Snapshot first: `tree.json` already holds the paths; hashes are not needed to put everything back.')
+  lines.push('2. Move one directory at a time, with a `decision` in the journal: what, from where, to where and why.')
+  lines.push('3. Do not move raw data (`data/raw/**`): it is protected by the guard, work happens on copies.')
+  lines.push('4. After every step run `notebook_verify`, so the chain stays intact.')
   lines.push('')
-  lines.push('## 6. Что спросить у владельца')
+  lines.push('## 6. What to ask the owner')
   lines.push('')
-  lines.push('- какой каталог — текущая работа (его берём в индекс первым)')
-  lines.push('- что уже опубликовано и не должно двигаться')
-  lines.push('- где сырые данные, которые нельзя трогать')
-  lines.push('- есть ли результаты, которые «не получились» и их надо сохранить как есть')
-  lines.push('- какие каталоги из списка «не трогаем» на самом деле архив')
+  lines.push('- which directory is current work (it enters the index first)')
+  lines.push('- what is already published and must not move')
+  lines.push('- where the raw data is that must not be touched')
+  lines.push('- whether there are results that "did not work out" and must be kept as they are')
+  lines.push('- which directories from the "left untouched" list are actually archive')
   const text = lines.join('\n')
   if (text.length <= JOURNAL_CAP) return text
   const cut = text.slice(0, JOURNAL_CAP)
   const lastBreak = cut.lastIndexOf('\n')
-  return `${cut.slice(0, lastBreak)}\n\n… журнал сокращён по бюджету ${Math.round(JOURNAL_CAP / 1000)} КБ: полные списки — в map.md и tree.json, размеры планов — в plan-*.json`
+  return `${cut.slice(0, lastBreak)}\n\n… the journal was trimmed to the ${Math.round(JOURNAL_CAP / 1000)} KB budget: full lists are in map.md and tree.json, the sizes of the plans are in plan-*.json`
 }
 
 async function mapPaths(workspace) {
@@ -682,23 +682,23 @@ async function ensureFile(path, content) {
   }
 }
 
-const AGENTS_POINTER = `# Инструкции для этого каталога
+const AGENTS_POINTER = `# Instructions for this directory
 
-Это существующий научный проект. Его структура сложилась до подключения
-harness'а и **не переделывается без решения владельца**.
+This is an existing research project. Its structure took shape before the harness
+was connected and is **not restructured without the owner's decision**.
 
-Карта проекта и архивный журнал лежат в \`.dsh/map/\`:
+The project map and the archival journal live in \`.dsh/map/\`:
 
-- \`.dsh/map/map.md\` — что где лежит (дерево, типы файлов, объёмы);
-- \`.dsh/map/tree.json\` — те же узлы для инструментов;
-- \`.dsh/map/archival-journal.md\` — факты, оценки и план встраивания.
+- \`.dsh/map/map.md\` — what sits where (tree, file kinds, sizes);
+- \`.dsh/map/tree.json\` — the same nodes for tools;
+- \`.dsh/map/archival-journal.md\` — facts, guesses and the plan for fitting in.
 
-Правила работы в этом каталоге:
+Rules for working in this directory:
 
-1. Прежде чем читать дерево руками, посмотри карту — она уже построена.
-2. Файлы не переименовывать и не перемещать без явного разрешения владельца.
-3. Сырые данные читать, работу вести на копиях; защищённые пути — в \`.dsh/policy.json\`.
-4. Всё, что считается, считается скриптом; всё, что утверждается, подтверждается путём.
+1. Before reading the tree by hand, look at the map — it is already built.
+2. Do not rename or move files without the owner's explicit permission.
+3. Read raw data, do the work on copies; the protected paths are in \`.dsh/policy.json\`.
+4. Everything computed is computed by a script; everything claimed is backed by a path.
 `
 
 const POLICY = {
@@ -761,7 +761,7 @@ export async function adoptProject(workspace, { root, mode = 'light', markers = 
       const created = await attempt(result.skipped, `${path}/`, () => mkdir(join(target, path), { recursive: true }))
       if (created) result.created.push(`${path}/`)
     }
-    const index = ['# Индекс: что уже есть в этом каталоге', '', 'Создан при встраивании. Файлы не перемещались.', '']
+    const index = ['# Index: what this directory already holds', '', 'Created while fitting in. No files were moved.', '']
     for (const [kind, count] of Object.entries(summary.byKind).sort((left, right) => right[1] - left[1])) {
       index.push(`## ${kind} (${count})`)
       const examples = map.nodes.flatMap((node) => node.samples.filter((sample) => kindOf(sample) === kind).map((sample) => toPosix(join(node.path === '.' ? '' : node.path, sample)))).slice(0, 12)
@@ -816,7 +816,7 @@ export function apply(ctx, config) {
       const summary = summarizeMap(map)
       const facts = await extractFacts(target, map)
       const mapText = renderMap(map, summary)
-      const factsText = ['', '## Факты', '', ...facts.map((fact) => `- \`${fact.path}\` — ${fact.text}`)].join('\n')
+      const factsText = ['', '## Facts', '', ...facts.map((fact) => `- \`${fact.path}\` — ${fact.text}`)].join('\n')
       const created = []
       if (args?.apply === true) {
         const paths = await mapPaths(workspace)
@@ -864,35 +864,35 @@ export function apply(ctx, config) {
         maxFiles: typeof args?.max_files === 'number' ? args.max_files : 20000,
         maxDepth: typeof args?.max_depth === 'number' ? args.max_depth : 6,
       })
-      if (result.ok === false) return { ok: false, error: result.error, target: result.target, text: `project_adopt: отказано — ${result.error}` }
+      if (result.ok === false) return { ok: false, error: result.error, target: result.target, text: `project_adopt: refused — ${result.error}` }
       const lines = []
-      lines.push(`Проект: ${result.target}`)
-      lines.push(`Каталогов ${result.summary.directories} · файлов ${result.summary.files}` +
-        `${result.summary.truncated ? ' · обход остановлен по лимиту' : ''}` +
-        `${(result.summary.packs ?? []).length > 0 ? ` · домен: ${result.summary.packs.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} %`).join(', ')}` : ' · домен не определён'}`)
+      lines.push(`Project: ${result.target}`)
+      lines.push(`Directories ${result.summary.directories} · files ${result.summary.files}` +
+        `${result.summary.truncated ? ' · the walk stopped at the limit' : ''}` +
+        `${(result.summary.packs ?? []).length > 0 ? ` · domain: ${result.summary.packs.map((hit) => `${hit.id} ${Math.round(hit.share * 100)} %`).join(', ')}` : ' · domain not determined'}`)
       lines.push('')
       lines.push(result.planText)
       lines.push('')
-      lines.push('## Три режима (выбрать с владельцем)')
+      lines.push('## Three modes (choose with the owner)')
       for (const plan of result.plans) {
-        const title = { 'as-is': 'как есть', light: 'легко', restructure: 'перестроить' }[plan.mode]
-        lines.push(`- **${title}** — создаёт ${plan.creates.length}, переносит ${plan.moves.length === 0 ? 'ничего' : `${plan.moves.length} групп файлов (по подтверждению)`}`)
+        const title = { 'as-is': 'as is', light: 'light', restructure: 'restructure' }[plan.mode]
+        lines.push(`- **${title}** — creates ${plan.creates.length}, moves ${plan.moves.length === 0 ? 'nothing' : `${plan.moves.length} groups of files (on confirmation)`}`)
       }
       if (result.skipped.length > 0) {
         lines.push('')
-        lines.push('Не удалось записать (каталог вне зоны записи или запрещён):')
+        lines.push('Could not write (directory outside the write zone or forbidden):')
         for (const item of result.skipped) lines.push(`  ! ${item.path} — ${item.reason}`)
-        lines.push('  Карта и журнал записаны в рабочую папку сессии; AGENTS.md и стандартные')
-        lines.push('  папки в самом проекте создаст владелец или шаг с danger-full-access.')
+        lines.push('  The map and the journal went to the session working folder; AGENTS.md and the standard')
+        lines.push('  folders in the project itself are created by the owner or by a step with danger-full-access.')
       }
       if (result.created.length > 0) {
         lines.push('')
-        lines.push('Записано:')
+        lines.push('Written:')
         for (const item of result.created) lines.push(`  + ${item}`)
-        if (result.kept.length > 0) for (const item of result.kept) lines.push(`  = ${item} (уже был, не перезаписан)`)
+        if (result.kept.length > 0) for (const item of result.kept) lines.push(`  = ${item} (already there, not overwritten)`)
       } else {
         lines.push('')
-        lines.push('Ничего не записано: это план. Повтори с apply=true, чтобы создать карту, архивный журнал и (для light/restructure) стандартные папки.')
+        lines.push('Nothing written: this is a plan. Repeat with apply=true to create the map, the archival journal and (for light/restructure) the standard folders.')
       }
       return { target: result.target, mode, summary: result.summary, text: lines.join('\n'), created: result.created, facts: result.facts }
     },

@@ -95,12 +95,12 @@ def auto_legend(ax, handles, labels, ncol=1, fontsize=7,
     best_loc, (best_hits, _) = min(pool.items(), key=lambda kv: kv[1][0])
 
     if verbose:
-        share = f"{lw * 100:.0f}%×{lh * 100:.0f}% панели"
+        share = f"{lw * 100:.0f}%×{lh * 100:.0f}% of the panel"
         if free:
-            print(f"    legend: {best_loc} ({best_hits} точек под легендой, {share})")
+            print(f"    legend: {best_loc} ({best_hits} points under the legend, {share})")
         else:
-            print(f"    legend: {best_loc} ({best_hits} точек под легендой, {share})"
-                  " — ВНИМАНИЕ: перекрывает метку панели, уменьши ncol/fontsize")
+            print(f"    legend: {best_loc} ({best_hits} points under the legend, {share})"
+                  " — WARNING: covers the panel letter, reduce ncol/fontsize")
 
     return ax.legend(handles=handles, labels=labels, loc=best_loc, ncol=ncol,
                      fontsize=fontsize, frameon=frameon, framealpha=framealpha,

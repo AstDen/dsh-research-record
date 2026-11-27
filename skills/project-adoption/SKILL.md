@@ -49,8 +49,8 @@ Before any fact enters the journal, open the file: `pdf_info` for a PDF,
 build. A folder with a `.tex` and no PDF is a manuscript that never compiled; a
 `.csv` named `final` with three rows is not a result.
 
-Write down only what the file shows. "Есть таблица с колонками `R, T_s, u`" is a
-fact. "Это основной результат" is a guess and gets marked as one.
+Write down only what the file shows. "A table with columns `R, T_s, u`" is a
+fact. "This is the main result" is a guess and gets marked as one.
 
 ## Step 3 — the archival lab notebook
 
@@ -67,16 +67,16 @@ Two outputs, same content, different consumers:
 
 Structure of the document (the tool writes this skeleton, you fill the meaning):
 
-1. **Карта** — counts by kind, run-like/paper-like/literature-like directories,
+1. **Map** — counts by kind, run-like/paper-like/literature-like directories,
    empty directories, what was not read.
-2. **Факты** — each with its path.
-3. **Оценки** — each marked as a guess, with what would confirm it.
-4. **План встраивания** — the three modes.
-5. **Как переносить** — one step at a time, `decision` per step, `notebook_verify`
+2. **Facts** — each with its path.
+3. **Guesses** — each marked as a guess, with what would confirm it.
+4. **Plan for fitting in** — the three modes.
+5. **How to move things** — one step at a time, `decision` per step, `notebook_verify`
    after each.
-6. **Что спросить у владельца** — the questions whose answers you do not have.
+6. **What to ask the owner** — the questions whose answers you do not have.
 
-Never write "проект в плохом состоянии" — write what is there and let the owner
+Never write "the project is in bad shape" — write what is there and let the owner
 judge. The point of the archival journal is that it keeps working after the
 conversation is forgotten.
 
@@ -87,13 +87,13 @@ The strength refers to how much of the owner's structure survives:
 
 | Mode | What changes | Risk | When to offer |
 | --- | --- | --- | --- |
-| `as-is` — встроиться как есть | only `.dsh/` (map, journal, policy) + an `AGENTS.md` pointer; not one folder is added | none | an established colleague, a project under review, a tree they are proud of |
-| `light` — встроиться легко | adds missing standard folders (`literature/ hypotheses/ models/ runs/ analysis/ paper/ talks/`) and `literature/_INDEX.md` listing what already exists; moves nothing | low — additive only | the usual case: the owner wants order but not to touch files |
-| `restructure` — перестроить | lists candidate moves (PDF → `literature/refs/`, tables+logs → `runs/<id>/results/`, images → `analysis/figures/`, `.tex` → `paper/`, meshes → `models/`); performed later, one directory at a time | high — the owner is the only one who can tell a dead run from the run behind a figure | the owner says "I cannot find anything any more" and accepts the cost |
+| `as-is` — fit in as is | only `.dsh/` (map, journal, policy) + an `AGENTS.md` pointer; not one folder is added | none | an established colleague, a project under review, a tree they are proud of |
+| `light` — fit in lightly | adds missing standard folders (`literature/ hypotheses/ models/ runs/ analysis/ paper/ talks/`) and `literature/_INDEX.md` listing what already exists; moves nothing | low — additive only | the usual case: the owner wants order but not to touch files |
+| `restructure` — restructure | lists candidate moves (PDF → `literature/refs/`, tables+logs → `runs/<id>/results/`, images → `analysis/figures/`, `.tex` → `paper/`, meshes → `models/`); performed later, one directory at a time | high — the owner is the only one who can tell a dead run from the run behind a figure | the owner says "I cannot find anything any more" and accepts the cost |
 
-Quote the owner's scale when they used one: «сильно встроиться — ничего не
-переделывая» is `as-is`, «средне — немного переделывая» is `light`, «слабо —
-многое переструктурировать» is `restructure`. Do not silently upgrade a mode.
+Quote the owner's scale when they used one: "fit in strongly — change
+nothing" is `as-is`, "medium — change a little" is `light`, "weakly —
+restructure a lot" is `restructure`. Do not silently upgrade a mode.
 
 `apply: true` writes only the additive parts: map files, archival journal,
 `.dsh/policy.json` (if absent), `AGENTS.md` (if absent — it is never overwritten),
@@ -127,7 +127,7 @@ Protect the owner from the two classic disasters:
 After adoption, seed the project from what was found:
 
 - `hypotheses/registry.md` entries from the archival journal, each marked
-  "унаследовано" with the path of the evidence;
+  "inherited" with the path of the evidence;
 - one `hypothesis` record per surviving open question, one `method` for the next
   step (not for the old work);
 - if a manuscript exists, `latex_look` it once to see whether it builds — a build

@@ -55,14 +55,14 @@ Detection order, cheapest first:
 | `paper` | `.tex`, `.docx`, `\title{}`, `refs`+figure directories | never moves |
 | `literature` | `.bib` + PDFs, or >N PDFs and no data | indexed into `literature/refs` |
 | `talks` | `.pptx`/`.odp`, poster PDFs | listed |
-| `admin` | grants, invoices, scans of forms, `.pdf` with "счёт/договор/акт" in name or text | listed, never analysed |
+| `admin` | grants, invoices, scans of forms, `.pdf` with "invoice/contract/act" in the name or text | listed, never analysed |
 | `archive` | zip/tar, `backup`/`copy`/`old` in name or a copy of another tree | flagged, not deleted |
 | `empty` | no files anywhere below | reported, never deleted |
 
 Roles come from **which files exist**, never from the folder name alone. A name
 can only *raise* the prior; the evidence decides. That is why an experiment
-folder `2024-05-12_проба3/` (csv + tif + pdf protocol) is recognised as a `run`
-without anyone writing a rule about Russian words.
+folder `2024-05-12_probe-3/` (csv + tif + pdf protocol) is recognised as a `run`
+without anyone writing a rule about the language of the folder name.
 
 ## 3. Packs: the domain-specific half, as data
 
@@ -84,7 +84,7 @@ A **pack** is a JSON file, no code:
     "case-time": { "parentHas": "system", "nameMatches": "^(0|[0-9]+(\\.[0-9]+)?)$", "role": "run" },
     "processor": { "nameMatches": "^processor[0-9]+$", "role": "run", "excludeFromNotable": true }
   },
-  "wording": { "run": "расчёт", "raw-data": "расчётные поля" }
+  "wording": { "run": "run", "raw-data": "solution fields" }
 }
 ```
 
@@ -105,19 +105,19 @@ A colleague adds `my-domain.json` next to these, or drops it into
 three strongest evidences:
 
 ```
-похоже на: numeric-openfoam 74% (system/controlDict ×12, time-каталоги ×1180,
+looks like: numeric-openfoam 74% (system/controlDict ×12, time directories ×1180,
            .cas.h5 ×9) · experiment 9% (Table_experiment_data_*.xlsx,
-           *.tif в data/) · literature 3% (.bib + 312 pdf)
+           *.tif under data/) · literature 3% (.bib + 312 pdf)
 ```
 
 Rules:
 
 - packs are additive — a mixed project gets both roles and both wordings;
-- if nothing matches above 5 %, the report says **«домен не определён»** and stays
+- if nothing matches above 5 %, the report says **"domain not determined"** and stays
   with the generic vocabulary — that is a valid, honest answer;
 - unknown names are not silently `other`: the map keeps
   `unknownNames: [{name, count, parent}]`, and the report prints the top 20 with
-  "предложить правило" next to each. That list is how a colleague's domain gets
+  "propose a rule" next to each. That list is how a colleague's domain gets
   supported without anyone guessing. (`.cgns` — 4 048 files — was found exactly
   this way.)
 

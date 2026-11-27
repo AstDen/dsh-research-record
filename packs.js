@@ -231,7 +231,7 @@ export function detectPacks(map, packs = [], { threshold = 0.05 } = {}) {
   return results.sort((left, right) => right.share - left.share)
 }
 
-/** Wording from the dominant pack: "расчёт" for CFD, "измерение" for an experiment. */
+/** Wording from the dominant pack: "run" for CFD, "measurement" for an experiment. */
 export function wordingOf(packs, detected) {
   const wording = {}
   for (const hit of detected) {
@@ -266,39 +266,39 @@ function scoreRoles(node, context) {
   const names = node.names ?? []
   const hasExtension = (list) => names.some((name) => list.some((extension) => name.toLowerCase().endsWith(`.${extension}`)))
 
-  if (kinds.total === 0 && (node.subtreeFiles ?? 0) === 0) add('empty', 2, 'нет файлов ни в этом каталоге, ни ниже')
+  if (kinds.total === 0 && (node.subtreeFiles ?? 0) === 0) add('empty', 2, 'no files in this directory or below it')
 
-  if (context.packRole !== undefined) add(context.packRole, 6, context.packReason ?? 'сигнатура пака')
+  if (context.packRole !== undefined) add(context.packRole, 6, context.packReason ?? 'pack signature')
 
   const resultEvidence = kinds.has('log') || kinds.has('table') || kinds.has('field') || kinds.has('post') || (kinds.has('binary') && kinds.has('dict'))
   const configEvidence = kinds.has('dict') || kinds.has('config') || kinds.has('case') || kinds.has('mesh') || hasExtension(['in', 'inp', 'setting', 'settings'])
-  if (resultEvidence && configEvidence) add('run', 5, 'есть входные параметры и результат')
-  else if (resultEvidence && kinds.has('log')) add('run', 3, 'есть лог выполнения')
-  else if (kinds.has('case') && kinds.has('field')) add('run', 4, 'расчётный каталог с полями')
+  if (resultEvidence && configEvidence) add('run', 5, 'input parameters and a result are both present')
+  else if (resultEvidence && kinds.has('log')) add('run', 3, 'a run log is present')
+  else if (kinds.has('case') && kinds.has('field')) add('run', 4, 'a case directory with fields')
 
   if (kinds.has('bib') || (kinds.has('pdf') && !kinds.has('table') && !kinds.has('code'))) {
-    add('literature', kinds.has('bib') === true && kinds.has('pdf') === true ? 4 : 3, 'библиография и/или подборка PDF без данных')
+    add('literature', kinds.has('bib') === true && kinds.has('pdf') === true ? 4 : 3, 'a bibliography and/or a set of PDFs with no data')
   }
-  if (kinds.has('tex') && (kinds.has('pdf') || kinds.has('image') || /paper|article|draft|статья|рукопись/i.test(node.path))) {
-    add('paper', 4, 'LaTeX и вложенные рисунки/PDF')
+  if (kinds.has('tex') && (kinds.has('pdf') || kinds.has('image') || /paper|article|draft|manuscript/i.test(node.path))) {
+    add('paper', 4, 'LaTeX and nested figures/PDFs')
   } else if (kinds.has('tex')) {
-    add('paper', 2, 'только LaTeX-исходник')
+    add('paper', 2, 'LaTeX source only')
   }
-  if (hasExtension(['pptx', 'ppt', 'odp', 'key'])) add('talks', 3, 'презентации')
+  if (hasExtension(['pptx', 'ppt', 'odp', 'key'])) add('talks', 3, 'presentations')
   if ((kinds.has('code') || kinds.has('notebook')) && (kinds.has('table') || kinds.has('image') || kinds.has('field'))) {
-    add('analysis', 3, 'код/ноутбук рядом с таблицами или рисунками')
+    add('analysis', 3, 'code/notebook next to tables or figures')
   } else if (kinds.has('code') || kinds.has('notebook')) {
-    add('analysis', 2, 'только код')
+    add('analysis', 2, 'code only')
   }
   if ((kinds.has('image') || kinds.has('binary')) && !kinds.has('code') && !kinds.has('tex') && !kinds.has('dict')) {
-    add('raw-data', 2, 'только исходные снимки/двоичные данные')
+    add('raw-data', 2, 'source images/binary data only')
   }
-  if (/raw|исходн|первичн/i.test(node.path) && kinds.total > 0) add('raw-data', 2, 'каталог назван как исходные данные')
-  if (/derived|processed|filtered|cropped|обработ|производн/i.test(node.path) && kinds.total > 0) add('derived', 2, 'каталог назван как производные данные')
-  if (/admin|документ|счет|счёт|договор|акт|grant|invoice/i.test(node.path) && (kinds.has('document') || kinds.has('pdf'))) {
-    add('admin', 3, 'документы, а не данные')
+  if (/raw|source|primary/i.test(node.path) && kinds.total > 0) add('raw-data', 2, 'the directory is named like source data')
+  if (/derived|processed|filtered|cropped/i.test(node.path) && kinds.total > 0) add('derived', 2, 'the directory is named like derived data')
+  if (/admin|document|invoice|grant|contract/i.test(node.path) && (kinds.has('document') || kinds.has('pdf'))) {
+    add('admin', 3, 'documents, not data')
   }
-  if (kinds.has('archive') && kinds.has('archive') >= Math.max(1, kinds.total - 1)) add('archive', 3, 'почти только архивы')
+  if (kinds.has('archive') && kinds.has('archive') >= Math.max(1, kinds.total - 1)) add('archive', 3, 'almost only archives')
 
   const best = scores.sort((left, right) => {
     if (right.score !== left.score) return right.score - left.score
@@ -384,7 +384,7 @@ export function assignRoles(map, packs = []) {
           if (extensionless < signature.minExtensionless) continue
         }
         packRole = signature.role
-        packReason = `пак ${pack.id}: ${signature.id ?? signature.role}`
+        packReason = `pack ${pack.id}: ${signature.id ?? signature.role}`
         node.excludeFromNotable = signature.excludeFromNotable === true
         if (signature.fieldFiles === true) node.fieldFiles = true
         break
@@ -393,7 +393,7 @@ export function assignRoles(map, packs = []) {
     }
     const best = scoreRoles(node, { packRole, packReason })
     node.role = best?.role ?? ((node.subtreeFiles ?? 0) === 0 ? 'empty' : 'mixed')
-    node.roleReason = best?.reason ?? 'нет характерных признаков'
+    node.roleReason = best?.reason ?? 'no characteristic evidence'
     roles[node.role] = (roles[node.role] ?? 0) + 1
   }
   // A directory without files is what its children are: `runs/` holding only
@@ -408,7 +408,7 @@ export function assignRoles(map, packs = []) {
     const top = [...counts.entries()].sort((left, right) => right[1] - left[1])[0]
     if (top !== undefined) {
       node.role = top[0]
-      node.roleReason = `как дочерние каталоги (${top[0]})`
+      node.roleReason = `as its child directories (${top[0]})`
     }
   }
   for (const node of map.nodes) {
@@ -468,27 +468,27 @@ export function skeletonForRoles(roles, wording = {}) {
   const present = (role) => (roles[role] ?? 0) > 0
   const directories = []
   const add = (path, reason) => directories.push({ path, reason })
-  add('paper', 'у статьи есть автор всегда')
-  add('admin', 'документы проекта (гранты, отчёты, счета) не данные')
+  add('paper', 'a paper always has an author')
+  add('admin', 'project documents (grants, reports, invoices) are not data')
   if (present('run') || present('raw-data') || present('derived')) {
-    add('data/raw', 'исходные данные неприкосновенны')
-    add('data/derived', 'производные данные отдельно от исходных')
+    add('data/raw', 'source data stays untouched')
+    add('data/derived', 'derived data kept apart from the source')
   }
   if (present('run')) {
-    add('runs', `${wording.run ?? 'прогоны'} — по каталогу на вариант`)
-    add('runs/logs', 'логи рядом с прогонами')
+    add('runs', `${wording.run ?? 'runs'} — one directory per variant`)
+    add('runs/logs', 'logs next to the runs')
   }
-  if (present('run') && (roles.mesh ?? 0) >= 0) add('models', 'сетки и конфигурации отдельно от результатов')
+  if (present('run') && (roles.mesh ?? 0) >= 0) add('models', 'meshes and configurations apart from the results')
   if (present('analysis') || present('run') || present('derived')) {
-    add('analysis/scripts', 'код, который считает')
-    add('analysis/figures', 'рисунки, которые генерируются скриптом')
-    add('analysis/tables', 'таблицы, которые генерируются скриптом')
+    add('analysis/scripts', 'the code that computes')
+    add('analysis/figures', 'figures produced by a script')
+    add('analysis/tables', 'tables produced by a script')
   }
   if (present('literature')) {
-    add('literature/refs', 'PDF и .bib')
-    add('literature/notes', 'карточки прочитанного')
+    add('literature/refs', 'PDFs and .bib')
+    add('literature/notes', 'cards on what was read')
   }
-  if (present('talks')) add('talks', 'презентации и доклады')
-  add('hypotheses', 'гипотезы должны быть записаны до прогона')
+  if (present('talks')) add('talks', 'presentations and talks')
+  add('hypotheses', 'hypotheses must be written down before a run')
   return directories
 }

@@ -1,6 +1,6 @@
 {
   "id": "experiment",
-  "title": "Экспериментальная установка и измерения",
+  "title": "Experimental setup and measurements",
   "kinds": {
     "extensions": {
       "lvm": "table",
@@ -32,8 +32,8 @@
     "extensions": { "lvm": 3, "tdms": 1, "cine": 1 }
   },
   "wording": {
-    "run": "серия измерений",
-    "raw-data": "первичные записи прибора",
-    "derived": "обработанные записи"
+    "run": "a measurement series",
+    "raw-data": "raw instrument records",
+    "derived": "processed records"
   }
 }

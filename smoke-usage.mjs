@@ -64,7 +64,7 @@ check('parseEvents keeps the failure', events[1].ok === false && events[1].error
 // --- routing rows name their tools ------------------------------------------
 const routed = routeTools(['PDF: pages, section, quote', 'pdf_info → pdf_outline; dsh-cite for references', ['pdf_info', 'pdf_outline', 'pdf_text']])
 check('routeTools uses the explicit tool list', routed.length === 3 && routed.includes('pdf_text'))
-check('routeTools never guesses from prose', routeTools(['analysis', 'скрипт в analysis/scripts/ → figures', []]).length === 0)
+check('routeTools never guesses from prose', routeTools(['analysis', 'a script in analysis/scripts/ → figures', []]).length === 0)
 check('routeTools ignores prose words', !routeTools(['x', 'scripts, figures, runs, template', ['pdf_info']]).includes('scripts'))
 
 // --- the summary adds up -----------------------------------------------------
@@ -100,24 +100,24 @@ const crafted = {
 const funnel = { counts: { hypothesis: 4, method: 1, observation: 0, decision: 0, note: 2, auto: 2, total: 7 }, outcomes: { signal: 0, null: 0, inconclusive: 0, 'technical-failure': 0 }, files: 1, withArtifacts: 0 }
 const advice = suggestions(crafted, funnel).join('\n')
 check('suggestions flag a failing tool', advice.includes('pdf_info') && advice.includes('60%'))
-check('suggestions flag an unused journal', advice.includes('журнал не ведётся'))
-check('suggestions flag hypotheses without observations', advice.includes('гипотезы без наблюдений'))
-check('suggestions flag unchecked figures', advice.includes('не проверяются'))
+check('suggestions flag an unused journal', advice.includes('the journal is not kept'))
+check('suggestions flag hypotheses without observations', advice.includes('hypotheses without observations'))
+check('suggestions flag unchecked figures', advice.includes('never checked'))
 check('suggestions name an unused route', advice.includes('rw_exec'))
 
 const quiet = suggestions(
   { ...crafted, tools: [{ tool: 'notebook', calls: 10, errors: 0, errorRate: 0, p50: 5, p95: 9, last: '' }], unusedRoutes: [] },
   { counts: { hypothesis: 2, method: 2, observation: 3, decision: 1, note: 0, auto: 0, total: 8 }, outcomes: { signal: 3, null: 0, inconclusive: 0, 'technical-failure': 0 }, files: 1, withArtifacts: 3 },
 ).join('\n')
-check('suggestions stay quiet when nothing is wrong', quiet.includes('сигналов для доработки не видно'))
+check('suggestions stay quiet when nothing is wrong', quiet.includes('nothing to fix is visible'))
 
 // --- the report is readable and honest --------------------------------------
 const text = renderReport(summary, funnel, { workspace, routes: true })
-check('report has a header with the period', text.includes('ОТЧЁТ ОБ ИСПОЛЬЗОВАНИИ') && text.includes('30 дн'))
+check('report has a header with the period', text.includes('USAGE REPORT') && text.includes('30 d'))
 check('report lists the tools', text.includes('pdf_info') && text.includes('notebook'))
-check('report shows the journal funnel', text.includes('ЖУРНАЛ') && text.includes('hypothesis 4'))
-check('report shows the suggestions', text.includes('ЧТО ПРЕДЛОЖЕНО МЕНЯТЬ'))
-check('report states what it does not contain', text.includes('значений аргументов'))
+check('report shows the journal funnel', text.includes('JOURNAL') && text.includes('hypothesis 4'))
+check('report shows the suggestions', text.includes('WHAT IS SUGGESTED TO CHANGE'))
+check('report states what it does not contain', text.includes('argument values'))
 check('report never prints a workspace path', !text.includes(workspace))
 
 // --- the plugin writes, reports and exports ---------------------------------
@@ -155,7 +155,7 @@ check('no argument value reaches the file', !raw.includes('secret title') && !ra
 
 const tool = tools.get('usage_report')
 const shown = await tool.execute({ action: 'summary', days: 30 }, exec)
-check('the tool renders the report', shown.text.includes('ОТЧЁТ ОБ ИСПОЛЬЗОВАНИИ') && shown.text.includes('notebook'))
+check('the tool renders the report', shown.text.includes('USAGE REPORT') && shown.text.includes('notebook'))
 check('the tool counts the call it reports on', shown.calls === 1)
 check('output.render returns a text block', tool.output.render({}, shown)[0].type === 'text')
 
@@ -167,7 +167,7 @@ const jsonFile = files.find((entry) => entry.startsWith('report-') && entry.ends
 check('export writes markdown and json', markdownFile !== undefined && jsonFile !== undefined)
 const markdown = await readFile(join(directory, markdownFile), 'utf8')
 const parsed = JSON.parse(await readFile(join(directory, jsonFile), 'utf8'))
-check('exported markdown is the report', markdown.includes('ОТЧЁТ ОБ ИСПОЛЬЗОВАНИИ'))
+check('exported markdown is the report', markdown.includes('USAGE REPORT'))
 check('exported json carries summary and funnel', parsed.summary !== undefined && parsed.funnel !== undefined && parsed.privacy !== undefined)
 check('exported report names no absolute path', !markdown.includes(workspace) && !JSON.stringify(parsed).includes(workspace))
 check('exported json keeps only the project basename', parsed.workspace === workspace.split('/').pop())

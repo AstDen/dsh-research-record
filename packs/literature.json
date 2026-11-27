@@ -1,6 +1,6 @@
 {
   "id": "literature",
-  "title": "Работа с научной литературой",
+  "title": "Scientific literature",
   "kinds": {
     "extensions": {
       "ris": "bib",
@@ -24,7 +24,7 @@
     {
       "id": "notes",
       "role": "literature",
-      "nameMatches": "^(notes|reading|карточки|конспекты|заметки)$"
+      "nameMatches": "^(notes|reading|cards|summaries|карточки|конспекты|заметки)$"
     }
   ],
   "match": {
@@ -39,8 +39,8 @@
     }
   },
   "wording": {
-    "run": "прогон по корпусу",
-    "literature": "подборка источников",
-    "analysis": "разбор источников"
+    "run": "a pass over the corpus",
+    "literature": "the set of sources",
+    "analysis": "reading the sources"
   }
 }

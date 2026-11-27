@@ -31,308 +31,311 @@ const IDENTITY_TTL_MS = 5000
 
 /** Folders every research project starts with, with the one-line purpose each. */
 export const FOLDERS = [
-  ['literature', 'источники: карточки, цитаты, PDF'],
-  ['literature/notes', 'одна заметка на источник'],
-  ['literature/refs', 'PDF и ссылки как есть'],
-  ['hypotheses', 'реестр гипотез и идей, статусы решений'],
-  ['models', 'сетапы, геометрия, граничные условия, версии решателя'],
-  ['runs', 'прогоны: один каталог = один прогон по протоколу'],
-  ['runs/logs', 'сырые логи решателей'],
-  ['data/raw', 'исходные данные — только чтение'],
-  ['data/derived', 'производные данные, пересобираемые скриптом'],
-  ['analysis/scripts', 'код анализа, который можно перезапустить'],
-  ['analysis/figures', 'рисунки, собранные скриптом'],
-  ['analysis/tables', 'таблицы результатов'],
-  ['paper', 'статья: исходники, разделы, рисунки'],
-  ['paper/sections', 'по файлу на раздел'],
-  ['paper/figures', 'только те рисунки, что вошли в статью'],
-  ['talks', 'доклады и презентации'],
-  ['admin', 'отчёты, формы, заявки, переписка'],
+  ['literature', 'sources: cards, quotes, PDFs'],
+  ['literature/notes', 'one note per source'],
+  ['literature/refs', 'PDFs and links as they are'],
+  ['hypotheses', 'registry of hypotheses and ideas, decision statuses'],
+  ['models', 'setups, geometry, boundary conditions, solver versions'],
+  ['runs', 'runs: one directory = one run under the protocol'],
+  ['runs/logs', 'raw solver logs'],
+  ['data/raw', 'source data — read-only'],
+  ['data/derived', 'derived data, rebuildable by a script'],
+  ['analysis/scripts', 'analysis code that can be re-run'],
+  ['analysis/figures', 'figures built by a script'],
+  ['analysis/tables', 'result tables'],
+  ['paper', 'paper: sources, sections, figures'],
+  ['paper/sections', 'one file per section'],
+  ['paper/figures', 'only the figures that made it into the paper'],
+  ['talks', 'talks and presentations'],
+  ['admin', 'reports, forms, applications, correspondence'],
 ]
 
-const AGENTS_MD = `# Научный проект: правила работы
+const AGENTS_MD = `# Research project: working rules
 
-Это каталог научного проекта, а не папка с файлами. Агент работает здесь как
-исполнитель исследования под руководством владельца проекта: результаты должны
-быть проверяемыми, а не правдоподобными.
+This is a research project directory, not a folder of files. The agent works here as
+the executor of a study under the project owner's direction: results must be
+verifiable, not merely plausible.
 
-## Что обязательно
+## What is mandatory
 
-1. **Журнал — часть работы, а не отчёт.** Перед прогоном или расчётом пиши
-   \`hypothesis\` (что ожидаем и почему) и \`method\` (как именно проверяем).
-   После — \`observation\` с числами, единицами и путём к артефакту. Решение с
-   причиной — \`decision\`. Ошибка или тупик — тоже запись, а не тишина.
-2. **Ничего не переписывай в \`data/raw/\`.** Исходные данные неизменяемы: работа
-   идёт на копиях в \`data/derived/\` или в каталоге прогона.
-3. **Каждое число — из файла.** Если в выводе стоит значение, должен быть путь к
-   артефакту, из которого оно получено. Пересчёт владельцем должен дать то же.
-4. **Один прогон — один каталог** в \`runs/\` по протоколу \`runs/README.md\`:
-   конфиг, входные данные, лог, результат, вывод. Без этого прогон не существует.
-5. **Графики строит скрипт**, лежащий в \`analysis/scripts/\`, а не «руками».
-   Рисунок без скрипта нельзя ни проверить, ни пересобрать.
-6. **Гипотеза живёт в \`hypotheses/registry.md\`**, а не только в чате: у неё есть
-   ID, статус и запись в журнале, которая её подтверждает или опровергает.
-7. **Не выдумывай — проверяй.** Путь проверяется (\`ls\`, \`test -f\`), число берётся
-   из файла, а не из памяти. Неоткрытый файл цитировать нельзя, незапущенную
-   команду описывать как выполненную — нельзя. Если проверка не удалась, так и
-   скажи, а не заполняй пробел правдоподобным ответом.
-8. **Считает скрипт.** Любая арифметика — пересчёт единиц, среднее, интеграл,
-   разность, подгонка, «на глаз видно, что в 1.5 раза» — выполняется скриптом в
-   \`analysis/scripts/\`, а не в голове и не в тексте ответа. Модель читает
-   результат скрипта; число без скрипта, который его посчитал, результатом не
-   является.
+1. **The journal is part of the work, not a report.** Before a run or a calculation
+   write \`hypothesis\` (what we expect and why) and \`method\` (how exactly we test
+   it). After it — \`observation\` with the numbers, units and the artifact path. A
+   decision with its reason is a \`decision\`. A failure or a dead end is a record
+   too, not silence.
+2. **Never rewrite anything in \`data/raw/\`.** Source data is immutable: the work
+   happens on copies in \`data/derived/\` or in the run directory.
+3. **Every number comes from a file.** If the output states a value, there must be a
+   path to the artifact it came from. The owner recomputing it must get the same.
+4. **One run, one directory** in \`runs/\` following the protocol in
+   \`runs/README.md\`: config, input data, log, result, conclusion. Without that the
+   run does not exist.
+5. **A script builds the figures**, one that lives in \`analysis/scripts/\`, not
+   "by hand". A figure without a script can be neither checked nor rebuilt.
+6. **A hypothesis lives in \`hypotheses/registry.md\`**, not only in the chat: it has
+   an ID, a status, and a journal record that confirms or refutes it.
+7. **Do not invent — verify.** A path is checked (\`ls\`, \`test -f\`), a number is
+   taken from a file, not from memory. A file you have not opened cannot be cited,
+   and a command you have not run cannot be described as executed. If a check
+   failed, say so instead of filling the gap with a plausible answer.
+8. **Scripts do the arithmetic.** Any arithmetic — unit conversion, mean, integral,
+   difference, fit, "you can see it is 1.5 times bigger" — runs in a script in
+   \`analysis/scripts/\`, not in the head and not in the reply text. The model reads
+   the script's result; a number without the script that computed it is not a
+   result.
 
-## Проверка вместо догадки
+## Verification instead of guessing
 
-- **Путь** — только после проверки (\`ls\`, \`test -f\`, чтение файла). «Обычно это
-  лежит в…» — запрещено; либо путь подтверждён, либо сказано, что не найден.
-- **Число** — только из файла, скрипта или лога, с путём к источнику. Значения из
-  памяти модели, «примерно», «должно быть порядка» — не результат.
-- **Данные** — прежде чем считать, посмотри, что реально в файле: число строк,
-  колонки, единицы, пропуски. Ответ, построенный на предполагаемой структуре
-  файла, — ошибка, даже если он красивый.
-- **Ссылка на источник** — открытый файл. Цитировать по названию, не открыв,
-  нельзя; ссылка на несуществующий артефакт — тоже ошибка.
-- **Не получилось** — так и напиши: что проверял, что именно не нашлось, что
-  нужно от владельца. Пустой пробел честнее правдоподобной выдумки.
+- **A path** only after checking (\`ls\`, \`test -f\`, reading the file). "Usually it
+  lives in…" is forbidden; either the path is confirmed or you say it was not found.
+- **A number** only from a file, a script or a log, with the path to the source.
+  Values from the model's memory, "approximately", "should be about" — not a result.
+- **Data** — before computing, look at what is really in the file: row count,
+  columns, units, gaps. An answer built on an assumed file structure is an error,
+  even a good-looking one.
+- **A source reference** — an opened file. Citing by title without opening it is not
+  allowed; a reference to a nonexistent artifact is an error too.
+- **It did not work** — say exactly that: what you checked, what was not found,
+  what you need from the owner. An empty gap is more honest than a plausible
+  invention.
 
-## Как двигаться
+## How to proceed
 
-- Сначала прочитай \`PROJECT.md\` — там вопрос, границы и критерий успеха. Если
-  его нет или он пуст, спроси владельца, а не придумывай.
-- План на несколько шагов согласуй до запуска дорогих расчётов: перебор
-  параметров, сетка, серия прогонов — это отдельное решение с оценкой стоимости.
-- Не выдавай предположение за результат. Формулировки «должно быть», «обычно»
-  допустимы только с пометкой, что это гипотеза.
+- Read \`PROJECT.md\` first — it holds the question, the scope and the success
+  criterion. If it is missing or empty, ask the owner instead of making it up.
+- Agree on a multi-step plan before launching expensive calculations: a parameter
+  sweep, a mesh, a series of runs is a separate decision with a cost estimate.
+- Do not pass an assumption off as a result. Phrasings like "should be" and
+  "usually" are allowed only when marked as a hypothesis.
 
-## Формы
+## Forms
 
-Готовые анкеты: \`PROJECT.md\` (проект), \`hypotheses/registry.md\` (гипотезы),
-\`runs/README.md\` (протокол прогона), \`analysis/README.md\` (анализ),
-\`paper/README.md\` (статья). Заполняй их по мере работы, а не в конце.
+Ready-made forms: \`PROJECT.md\` (project), \`hypotheses/registry.md\` (hypotheses),
+\`runs/README.md\` (run protocol), \`analysis/README.md\` (analysis),
+\`paper/README.md\` (paper). Fill them in as you work, not at the end.
 `
 
 const README_MD = (projectName) => `# ${projectName}
 
-Научный проект. Карта каталога и порядок работы.
+Research project. Map of the directory and the order of work.
 
-## Каталог
+## Directory
 
-| Путь | Что внутри | Правило |
+| Path | What is inside | Rule |
 | --- | --- | --- |
-| \`PROJECT.md\` | анкета проекта: вопрос, границы, критерий успеха | заполняется первым |
-| \`literature/\` | карточки источников, цитаты, PDF | одна заметка на источник |
-| \`hypotheses/\` | реестр гипотез и идей | ID, статус, чем проверено |
-| \`models/\` | сетапы, геометрия, BC, версии решателя | версия фиксируется |
-| \`runs/\` | прогоны по протоколу | один прогон = один каталог |
-| \`data/raw/\` | исходные данные | только чтение |
-| \`data/derived/\` | производные данные | пересобираются скриптом |
-| \`analysis/\` | скрипты, рисунки, таблицы | рисунок = результат скрипта |
-| \`paper/\` | статья и её рисунки | раздел = файл |
-| \`talks/\` | доклады, презентации | — |
-| \`admin/\` | отчёты, формы, заявки | — |
-| \`.dsh/\` | журнал и провенанс | не редактировать руками |
+| \`PROJECT.md\` | project brief: question, scope, success criterion | filled in first |
+| \`literature/\` | source cards, quotes, PDFs | one note per source |
+| \`hypotheses/\` | registry of hypotheses and ideas | ID, status, what tested it |
+| \`models/\` | setups, geometry, BCs, solver versions | the version is recorded |
+| \`runs/\` | runs under the protocol | one run = one directory |
+| \`data/raw/\` | source data | read-only |
+| \`data/derived/\` | derived data | rebuilt by a script |
+| \`analysis/\` | scripts, figures, tables | a figure = a script result |
+| \`paper/\` | the paper and its figures | section = file |
+| \`talks/\` | talks, presentations | — |
+| \`admin/\` | reports, forms, applications | — |
+| \`.dsh/\` | journal and provenance | do not edit by hand |
 
-## Порядок работы
+## Order of work
 
-1. Заполнить \`PROJECT.md\` (или попросить агента задать вопросы).
-2. Занести гипотезы в \`hypotheses/registry.md\`.
-3. Собрать модель/сетап в \`models/\`, прогон — в \`runs/\`.
-4. Разобрать результаты в \`analysis/\`, записав наблюдения в журнал.
-5. Собрать статью в \`paper/\`.
+1. Fill in \`PROJECT.md\` (or have the agent put the questions to you).
+2. Enter the hypotheses in \`hypotheses/registry.md\`.
+3. Build the model/setup in \`models/\`, the run in \`runs/\`.
+4. Work through the results in \`analysis/\`, recording the observations in the journal.
+5. Assemble the paper in \`paper/\`.
 
-## Журнал
+## Journal
 
-\`.dsh/notebook/<sessionId>.jsonl\` — записи с хеш-цепочкой; \`.dsh/provenance/\` —
-откуда взялся каждый файл. Агент пишет туда через инструмент \`notebook\`; читать
-и проверять — \`notebook_search\` и \`notebook_verify\`.
+\`.dsh/notebook/<sessionId>.jsonl\` — hash-chained records; \`.dsh/provenance/\` —
+where each file came from. The agent writes there through the \`notebook\` tool; read
+and check with \`notebook_search\` and \`notebook_verify\`.
 `
 
-const PROJECT_MD = (projectName) => `# Анкета проекта: ${projectName}
+const PROJECT_MD = (projectName) => `# Project brief: ${projectName}
 
-> Заполняется до первых расчётов. Пустые пункты — это открытые вопросы, а не
-> мелочи: агент обязан спросить, а не догадаться.
+> Filled in before the first calculations. An empty item is an open question, not
+> a detail: the agent must ask, not guess.
 
-## 1. Вопрос
+## 1. Question
 
-- **Главный вопрос исследования:**
-- **Почему он важен (1–3 предложения):**
-- **Что уже известно / что проверили раньше:**
+- **Main research question:**
+- **Why it matters (1–3 sentences):**
+- **What is already known / what was checked earlier:**
 
-## 2. Границы
+## 2. Scope
 
-- **Что входит в работу:**
-- **Что сознательно не входит:**
-- **Допущения, которые принимаем без проверки:**
+- **What is in scope:**
+- **What is deliberately out of scope:**
+- **Assumptions we accept without checking:**
 
-## 3. Гипотезы
+## 3. Hypotheses
 
-| ID | Гипотеза | Как проверим | Что будет означать провал |
+| ID | Hypothesis | How we test it | What failure would mean |
 | --- | --- | --- | --- |
 | H-1 |  |  |  |
 | H-2 |  |  |  |
 
-## 4. Данные
+## 4. Data
 
-- **Что за данные и откуда:**
-- **Объём и формат:**
-- **Ограничения (шум, пропуски, диапазон применимости):**
+- **What the data is and where it comes from:**
+- **Volume and format:**
+- **Limitations (noise, gaps, range of validity):**
 
-## 5. Модель / установка
+## 5. Model / rig
 
-- **Решатель, версия, геометрия:**
-- **Граничные условия и режим:**
-- **Параметры, которые будем менять (и почему):**
-- **Сетка и проверка сеточной независимости:**
+- **Solver, version, geometry:**
+- **Boundary conditions and regime:**
+- **Parameters we will vary (and why):**
+- **Mesh and mesh-independence check:**
 
-## 6. Результат
+## 6. Result
 
-- **Что считаем успехом (числовые критерии):**
-- **Какой артефакт должен остаться (таблица, рисунок, файл):**
-- **Кому и где это будет показано:**
+- **What counts as success (numeric criteria):**
+- **Which artifact must remain (table, figure, file):**
+- **Who it is shown to, and where:**
 
-## 7. Ресурсы и сроки
+## 7. Resources and schedule
 
-- **Расчётное время и машины:**
-- **Дедлайн / контрольные точки:**
-- **Бюджет на внешние вычисления (если есть):**
+- **Compute time and machines:**
+- **Deadline / checkpoints:**
+- **Budget for external computing (if any):**
 `
 
-const LITERATURE_README = `# Литература
+const LITERATURE_README = `# Literature
 
-Одна карточка на источник — \`literature/notes/<год>-<первый автор>.md\`.
-PDF и ссылки — в \`literature/refs/\` (или Zotero, тогда здесь только citekey).
+One card per source — \`literature/notes/<year>-<first author>.md\`.
+PDFs and links go to \`literature/refs/\` (or Zotero, in which case only the citekey is here).
 
-## Карточка источника
+## Source card
 
 \`\`\`markdown
-# <Автор, год> — <короткое название>
+# <Author, year> — <short title>
 
-- **Полная ссылка / DOI:**
-- **Что проверяет:** (одна фраза)
-- **Метод:** (установка, решатель, эксперимент)
-- **Результаты:** (числа с единицами, диапазоны)
-- **Ограничения:** (что не покрывает)
-- **Чем полезно нам:** (какой раздел / гипотезу поддерживает)
-- **Цитата для статьи:** (если нужна дословная)
+- **Full reference / DOI:**
+- **What it tests:** (one phrase)
+- **Method:** (rig, solver, experiment)
+- **Results:** (numbers with units, ranges)
+- **Limitations:** (what it does not cover)
+- **Why it is useful to us:** (which section / hypothesis it supports)
+- **Quote for the paper:** (if a verbatim one is needed)
 \`\`\`
 
-## Реестр
+## Registry
 
-| Источник | Год | Тема | Поддерживает | Спорит с | Citekey |
+| Source | Year | Topic | Supports | Disagrees with | Citekey |
 | --- | --- | --- | --- | --- | --- |
 `
 
-const HYPOTHESES_README = `# Реестр гипотез
+const HYPOTHESES_README = `# Hypothesis registry
 
-Гипотеза без ID и статуса — это идея, а не гипотеза. Статус меняется только
-вместе с записью в журнале, которая его меняет.
+A hypothesis without an ID and a status is an idea, not a hypothesis. A status
+changes only together with the journal record that changes it.
 
-| ID | Гипотеза (утверждение, проверяемое) | Статус | Проверка | Запись в журнале | Дата |
+| ID | Hypothesis (a testable statement) | Status | Test | Journal record | Date |
 | --- | --- | --- | --- | --- | --- |
-| H-1 |  | открыта |  |  |  |
+| H-1 |  | open |  |  |  |
 
-Статусы: \`открыта\` → \`в работе\` → \`подтверждена\` / \`опровергнута\` / \`отложена\`.
+Statuses: \`open\` → \`in progress\` → \`confirmed\` / \`refuted\` / \`deferred\`.
 
-## Идеи, ещё не ставшие гипотезой
+## Ideas that are not hypotheses yet
 
-- (сюда — догадки, аналогии, «а что если»; при повышении статуса переносится в таблицу)
+- (guesses, analogies, "what if" go here; when the status is raised the entry moves to the table)
 `
 
-const MODELS_README = `# Модели и сетапы
+const MODELS_README = `# Models and setups
 
-Один сетап — один подкаталог: \`models/<модель-версия>/\`. Версия решателя и
-сетки фиксируется в \`setup.md\`, иначе прогоны через месяц несравнимы.
+One setup — one subdirectory: \`models/<model-version>/\`. The solver and mesh
+version is recorded in \`setup.md\`, otherwise runs a month apart are not comparable.
 
-## Что фиксировать в \`setup.md\`
+## What to record in \`setup.md\`
 
-- решатель и версия (\`ANSYS Fluent 2026 R1\`, \`OpenFOAM 14\`, номер сборки);
-- геометрия и источник файла, единицы;
-- граничные условия и начальные значения;
-- модель турбулентности/горения/радиации и её параметры;
-- сетка: число ячеек, \`y+\`, проверка сеточной независимости (ссылка на отчёт);
-- схема и релаксация/устойчивость;
-- известные ограничения и режим применимости.
+- solver and version (\`ANSYS Fluent 2026 R1\`, \`OpenFOAM 14\`, build number);
+- geometry and the source of the file, units;
+- boundary conditions and initial values;
+- turbulence/combustion/radiation model and its parameters;
+- mesh: cell count, \`y+\`, mesh-independence check (a link to the report);
+- scheme and relaxation/stability;
+- known limitations and range of validity.
 `
 
-const RUNS_README = `# Протокол прогона
+const RUNS_README = `# Run protocol
 
-Один прогон — один каталог: \`runs/<дата>-<короткое-имя>/\`. Прогон, у которого
-нет конфига или лога, не существует: результат нельзя ни защитить, ни повторить.
+One run — one directory: \`runs/<date>-<short-name>/\`. A run that has no config
+or no log does not exist: its result can be neither defended nor reproduced.
 
-## Обязательное содержимое каталога прогона
+## Mandatory contents of a run directory
 
 \`\`\`
 runs/2026-11-27-baseline/
-  run.md          # что и зачем: гипотеза, изменённые параметры, ожидание
-  config/         # конфиги, journal, case-файлы (как есть)
-  inputs/         # ссылки на входные данные (не копии сырых данных)
-  log             # сырой лог решателя
-  results/        # поля, CSV, отчёты
-  conclusion.md   # что получилось: числа, совпало ли с ожиданием, что дальше
+  run.md          # what and why: hypothesis, changed parameters, expectation
+  config/         # configs, journal, case files (as they are)
+  inputs/         # links to the input data (not copies of raw data)
+  log             # raw solver log
+  results/        # fields, CSV, reports
+  conclusion.md   # what came out: numbers, whether it matched the expectation, what next
 \`\`\`
 
-## Минимум в \`run.md\`
+## Minimum in \`run.md\`
 
-- **Гипотеза / вопрос прогона:** ссылка на ID из реестра;
-- **Что изменилось** относительно предыдущего прогона;
-- **Ожидание** (число или направление) — до запуска;
-- **Критерий остановки** (сходимость, время, бюджет).
+- **Hypothesis / question of the run:** a reference to an ID from the registry;
+- **What changed** relative to the previous run;
+- **Expectation** (a number or a direction) — before the launch;
+- **Stopping criterion** (convergence, time, budget).
 
-## Минимум в \`conclusion.md\`
+## Minimum in \`conclusion.md\`
 
-- числа с единицами и путями к файлам;
-- совпало с ожиданием или нет — и почему;
-- что делать дальше: ещё прогон, другой параметр, остановиться.
+- numbers with units and paths to the files;
+- whether it matched the expectation or not — and why;
+- what to do next: another run, a different parameter, stop.
 `
 
-const ANALYSIS_README = `# Анализ
+const ANALYSIS_README = `# Analysis
 
-- код — \`analysis/scripts/<тема>.py\` (или \`.m\`, \`.jl\`); запускается одной командой;
-- рисунки — \`analysis/figures/\`, имя = что показано + дата, генерируются скриптом;
-- таблицы — \`analysis/tables/\`, CSV + markdown-версия для статьи.
+- code — \`analysis/scripts/<topic>.py\` (or \`.m\`, \`.jl\`); it starts with a single command;
+- figures — \`analysis/figures/\`, name = what is shown + date, generated by a script;
+- tables — \`analysis/tables/\`, CSV + a markdown version for the paper.
 
-## Правила
+## Rules
 
-1. Скрипт читает \`runs/*/results\` или \`data/derived/\` — не \`data/raw/\`.
-2. Каждый рисунок воспроизводим: в заголовке скрипта — какие данные и какие
-   прогоны он использует.
-3. Числа в тексте статьи берутся из таблицы, а не набираются руками.
-4. Выброс и отбракованная точка фиксируются в журнале: сколько, почему, что это
-   меняет в выводе.
-5. Любое число, которое кто-то будет перепроверять, считает скрипт: среднее,
-   разность, отношение, пересчёт единиц, интеграл, подгонка. Арифметика «в уме»
-   в ответе или в тексте статьи — источник ошибок, которые никто не найдёт.
+1. A script reads \`runs/*/results\` or \`data/derived/\` — not \`data/raw/\`.
+2. Every figure is reproducible: the script header says which data and which
+   runs it uses.
+3. Numbers in the paper text come from a table, they are not typed by hand.
+4. An outlier and a rejected point are recorded in the journal: how many, why, and
+   what that changes in the conclusion.
+5. Any number someone will re-check is computed by a script: mean,
+   difference, ratio, unit conversion, integral, fit. Mental arithmetic in a reply
+   or in the paper text is a source of errors nobody will find.
 `
 
-const PAPER_README = (projectName) => `# Статья: ${projectName}
+const PAPER_README = (projectName) => `# Paper: ${projectName}
 
-\`main.tex\` + \`sections/*.tex\`. Рисунки для статьи — только из
-\`analysis/figures/\`, скопированные в \`paper/figures/\` вместе с именем скрипта,
-который их породил.
+\`main.tex\` + \`sections/*.tex\`. Figures for the paper come only from
+\`analysis/figures/\`, copied into \`paper/figures/\` together with the name of the
+script that produced them.
 
-## План
+## Plan
 
-| Раздел | Файл | Статус | Опора (журнал / прогоны) |
+| Section | File | Status | Support (journal / runs) |
 | --- | --- | --- | --- |
-| Введение | \`sections/intro.tex\` | нет |  |
-| Методика | \`sections/methods.tex\` | нет |  |
-| Результаты | \`sections/results.tex\` | нет |  |
-| Обсуждение | \`sections/discussion.tex\` | нет |  |
-| Заключение | \`sections/conclusion.tex\` | нет |  |
+| Introduction | \`sections/intro.tex\` | no |  |
+| Methods | \`sections/methods.tex\` | no |  |
+| Results | \`sections/results.tex\` | no |  |
+| Discussion | \`sections/discussion.tex\` | no |  |
+| Conclusion | \`sections/conclusion.tex\` | no |  |
 
-## Правила
+## Rules
 
-- Methods пишутся из журнала и протоколов прогонов, а не по памяти.
-- Каждое утверждение в Results опирается на конкретный прогон или таблицу.
-- Рисунок попадает в статью только вместе со скриптом, который его строит.
+- Methods is written from the journal and the run protocols, not from memory.
+- Every claim in Results rests on a specific run or table.
+- A figure enters the paper only together with the script that builds it.
 `
 
-const TALKS_README = `# Доклады
+const TALKS_README = `# Talks
 
-Один доклад — один подкаталог: \`talks/<конференция-год>/\` (слайды, заметки,
-сборник тезисов). Слайды собираются из тех же рисунков, что и статья: расхождение
-чисел между докладом и статьёй — ошибка, а не оформление.
+One talk — one subdirectory: \`talks/<conference-year>/\` (slides, notes, the
+abstract collection). Slides are assembled from the same figures as the paper: a
+mismatch of numbers between the talk and the paper is an error, not formatting.
 `
 
 /**
@@ -401,10 +404,10 @@ export async function scaffoldResearchProject(workspace, options = {}) {
   if (options.brief !== undefined && typeof options.brief === 'string' && options.brief.trim().length > 0) {
     const briefPath = join(root, 'PROJECT.md')
     const existing = existsSync(briefPath) ? readFileSync(briefPath, 'utf8') : ''
-    const line = `\n## Вопрос (из запроса)\n\n${options.brief.trim()}\n`
+    const line = `\n## Question (from the request)\n\n${options.brief.trim()}\n`
     if (!existing.includes(options.brief.trim())) {
       await writeFile(briefPath, `${existing.trimEnd()}\n${line}`, 'utf8')
-      // The report lists real paths only: a label like "PROJECT.md (вопрос)" was
+      // The report lists real paths only: a label like "PROJECT.md (question)" was
       // turned into a journal artifact and hashed as missing.
       if (existing.trim().length === 0) created.push('PROJECT.md')
       else updated.push('PROJECT.md')
@@ -482,11 +485,11 @@ function projectIdentity(workspace) {
 /** One-line map of the project for the prompt. */
 function identityText(marker) {
   const lines = [
-    `исследовательский проект: ${marker.name ?? 'без названия'} (фаза: ${marker.phase ?? 'setup'})`,
-    'это каталог научного проекта: правила работы — в AGENTS.md в корне проекта, анкета — в PROJECT.md; если PROJECT.md пуст, спроси владельца, а не додумывай.',
-    'карта: literature/ (источники) hypotheses/ (реестр) models/ (сетапы) runs/ (прогоны по протоколу) data/raw (только чтение) data/derived analysis/ (скрипты, рисунки, таблицы) paper/ talks/ admin/',
-    'дисциплина журнала: hypothesis и method до прогона, observation с числами/единицами/путём к артефакту после, decision с причиной; архивные данные не переписывать.',
-    'не выдумывать: пути и данные проверять (ls/test/чтение), числа брать из файла или лога; любые вычисления — скриптом в analysis/scripts/, не в уме; чего нет — говорить «не найдено».',
+    `research project: ${marker.name ?? 'untitled'} (phase: ${marker.phase ?? 'setup'})`,
+    'this is a research project directory: the working rules are in AGENTS.md at the project root, the brief is in PROJECT.md; if PROJECT.md is empty, ask the owner instead of guessing.',
+    'map: literature/ (sources) hypotheses/ (registry) models/ (setups) runs/ (runs under the protocol) data/raw (read-only) data/derived analysis/ (scripts, figures, tables) paper/ talks/ admin/',
+    'journal discipline: hypothesis and method before a run, observation with numbers/units/artifact path after it, decision with its reason; never rewrite archived data.',
+    'do not invent: check paths and data (ls/test/read), take numbers from a file or a log; any computation goes in a script under analysis/scripts/, not in the head; when something is missing, say "not found".',
   ]
   return lines.join('\n')
 }
@@ -573,7 +576,7 @@ export function apply(ctx, config) {
   if (typeof commands?.register === 'function') commands.register({
     name: 'research-init',
     description: 'Create the research project infrastructure in this directory (folders, forms, AGENTS.md, journal marker)',
-    input: { hint: '[название проекта]' },
+    input: { hint: '[project name]' },
     async handler(invocation) {
       try {
         const workspace = await workspaceOfAgent(invocation.agent)
@@ -589,12 +592,12 @@ export function apply(ctx, config) {
         } catch {
           /* the journal note is a convenience; the scaffold itself succeeded */
         }
-        const parts = [`научный проект «${report.project}» готов: ${report.workspace}`]
-        parts.push(`папок: ${report.folders.length}, создано файлов: ${report.created.filter((entry) => !entry.endsWith('/')).length}`)
-        if (report.updated.length > 0) parts.push(`дополнено: ${report.updated.join(', ')}`)
-        if (report.backedUp.length > 0) parts.push(`бэкап перед перезаписью: ${report.backedUp.join(', ')}`)
-        if (report.skipped.length > 0) parts.push(`не тронуто: ${report.skipped.join(', ')}`)
-        parts.push('дальше: заполнить PROJECT.md и hypotheses/registry.md, затем работать через runs/ и analysis/.')
+        const parts = [`research project "${report.project}" ready: ${report.workspace}`]
+        parts.push(`folders: ${report.folders.length}, files created: ${report.created.filter((entry) => !entry.endsWith('/')).length}`)
+        if (report.updated.length > 0) parts.push(`updated: ${report.updated.join(', ')}`)
+        if (report.backedUp.length > 0) parts.push(`backed up before overwrite: ${report.backedUp.join(', ')}`)
+        if (report.skipped.length > 0) parts.push(`kept as-is: ${report.skipped.join(', ')}`)
+        parts.push('next: fill in PROJECT.md and hypotheses/registry.md, then work through runs/ and analysis/.')
         return { kind: 'success', text: parts.join('\n') }
       } catch (error) {
         return { kind: 'error', text: `research-init: ${String(error?.message ?? error)}` }

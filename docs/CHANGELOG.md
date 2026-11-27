@@ -145,6 +145,38 @@ session project instead of the home directory, `notebook` writes to
   same bytes. Such an edge is reported without a previous hash.
 - `__pycache__/`, `.dsh/` and `.tmp/` are gitignored.
 
+### Documentation, packaging and language
+
+- **The bundle speaks English.** Every message, comment, doc, skill, fixture and
+  test outside the localisation layer was translated. What legitimately stays
+  Russian is data: `locale/ru.json`, the client's `ru` dictionary, the bilingual
+  unit glossary and panel-letter tables of `figurelib/`, the guard's bilingual
+  confirmation prompt, the `экспорт` alias of the usage-report action, and the
+  Russian folder names the survey packs still recognise (`литература`,
+  `статьи`, `заметки`, …).
+- **A new icon** — graduate cap, magnifier and notebook, drawn from primitives
+  only, legible at 48 px.
+- **CI exists**: `.github/workflows/test.yml` runs the whole suite on Node 22 for
+  every push and pull request, installing `matplotlib`/`numpy` for the figure
+  tests.
+- **`package.json` is publishable**: `repository`, `author`, `homepage`, `bugs`
+  and `engines.node` were `null` and now carry real values; `scripts/` is in
+  `files`.
+- **The install instructions work**: the README no longer tells a new user to
+  `dsh plugin add dsh-research-record` (nothing is published to npm); it gives a
+  local clone and a `git+https://` specifier, states the requirements, adds a CI
+  badge and a “First five minutes” walkthrough.
+- **`docs/READINESS.md`** — what works for an outside user, what does not, and
+  what to add before advertising the bundle (a package or tarball, `SECURITY.md`,
+  an issue template).
+- **`docs/releases/v0.8.2.md`** and **`scripts/github-metadata.sh`** — the release
+  notes and the script that sets the repository description, homepage, topics and
+  the GitHub release from them (it prints what to paste instead of failing when no
+  token is present).
+- **No bytecode in the repository.** Five `figurelib/__pycache__/*.pyc` files had
+  been committed — `.gitignore` lists `__pycache__/`, but an ignore rule does not
+  apply to a file already tracked. They are removed from the index and stay out.
+
 ## 0.8.1 — the record lands in the project, or not at all
 
 - **Fixed: the journal could be written into the launcher's tree.** A session

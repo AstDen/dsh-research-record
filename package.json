@@ -38,7 +38,8 @@
     "survey.js",
     "fixtures",
     "packs",
-    "packs.js"
+    "packs.js",
+    "scripts"
   ],
   "scripts": {
     "test": "node smoke.mjs && node smoke-client.mjs && node smoke-figures.mjs && node smoke-adopt.mjs && node smoke-usage.mjs && node smoke-stack.mjs && node smoke-scaffold.mjs && node smoke-fixes.mjs && node smoke-cordis.mjs && node smoke-regress.mjs",
@@ -53,8 +54,18 @@
       "immediately": true
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AstDen/dsh-research-record.git"
+  },
+  "author": "AstDen",
+  "homepage": "https://github.com/AstDen/dsh-research-record#readme",
+  "bugs": {
+    "url": "https://github.com/AstDen/dsh-research-record/issues"
+  },
   "engines": {
-    "dsh": ">=0.2.0 <0.3.0"
+    "dsh": ">=0.2.0 <0.3.0",
+    "node": ">=22"
   },
   "keywords": [
     "dsh",

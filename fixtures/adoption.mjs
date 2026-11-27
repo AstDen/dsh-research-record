@@ -12,24 +12,24 @@ import { dirname, join } from 'node:path'
 
 const FIXTURES = {
   'exp-session': {
-    'записи/серия_01/acquisition.xml': '<acquisition><frames>1200</frames></acquisition>',
-    'записи/серия_01/scan_0001.lvm': 'x,y\n0,1\n1,2\n',
-    'записи/серия_01/scan_0002.lvm': 'x,y\n0,1.1\n1,2.1\n',
-    'записи/серия_01/scan_0003.lvm': 'x,y\n0,1.2\n1,2.2\n',
-    'записи/калибровка/calibration.png': 'PNG-placeholder',
-    'обработка/fit_curve.py': 'import numpy as np\n',
-    'обработка/results.csv': 'u,dpdx\n0.1,1.2\n',
-    'статья/draft.tex': '\\documentclass{article}\\title{Pressure drop in a porous tube}\n'
+    'record/series_01/acquisition.xml': '<acquisition><frames>1200</frames></acquisition>',
+    'record/series_01/scan_0001.lvm': 'x,y\n0,1\n1,2\n',
+    'record/series_01/scan_0002.lvm': 'x,y\n0,1.1\n1,2.1\n',
+    'record/series_01/scan_0003.lvm': 'x,y\n0,1.2\n1,2.2\n',
+    'record/calibration/calibration.png': 'PNG-placeholder',
+    'processing/fit_curve.py': 'import numpy as np\n',
+    'processing/results.csv': 'u,dpdx\n0.1,1.2\n',
+    'manuscript/draft.tex': '\\documentclass{article}\\title{Pressure drop in a porous tube}\n'
   },
   'lit-only': {
-    'литература/pdfs/galowin1974.pdf': '%PDF-1.4 placeholder',
-    'литература/pdfs/hager1987.pdf': '%PDF-1.4 placeholder',
-    'литература/pdfs/ergun1952.pdf': '%PDF-1.4 placeholder',
-    'литература/pdfs/dietrich1994.pdf': '%PDF-1.4 placeholder',
-    'литература/pdfs/unknown2019.pdf': '%PDF-1.4 placeholder',
-    'литература/library.bib': '@article{galowin1974,\n title={Investigation of laminar flow}\n}\n',
-    'заметки/reading-log.md': '# Прочитано\n\n- Galowin 1974\n',
-    'обзор/review.tex': '\\documentclass{article}\\title{Обзор пористого горения}\n'
+    'literature/pdfs/galowin1974.pdf': '%PDF-1.4 placeholder',
+    'literature/pdfs/hager1987.pdf': '%PDF-1.4 placeholder',
+    'literature/pdfs/ergun1952.pdf': '%PDF-1.4 placeholder',
+    'literature/pdfs/dietrich1994.pdf': '%PDF-1.4 placeholder',
+    'literature/pdfs/unknown2019.pdf': '%PDF-1.4 placeholder',
+    'literature/library.bib': '@article{galowin1974,\n title={Investigation of laminar flow}\n}\n',
+    'notes/reading-log.md': '# Read\n\n- Galowin 1974\n',
+    'review/review.tex': '\\documentclass{article}\\title{Review of porous combustion}\n'
   },
   'custom-code': {
     'src/solver.f90': 'program solver\nend program\n',
@@ -42,19 +42,19 @@ const FIXTURES = {
     'paper/main.tex': '\\documentclass{article}\\title{Custom solver}\n'
   },
   'mixed': {
-    'эксперимент/2024_05_12/scan.lvm': 'x,y\n0,1\n',
-    'расчёт/base/case.foam': 'placeholder',
-    'расчёт/base/0/U': 'dimensions [0 1 -1 0 0 0 0];\n',
-    'расчёт/base/0/p': 'dimensions [0 2 -2 0 0 0 0];\n',
-    'расчёт/base/constant/polyMesh/points': '10\n(\n)\n',
-    'расчёт/base/system/controlDict': 'FoamFile\n{\n    version 2.0;\n}\n',
-    'литература/refs/paper.pdf': '%PDF-1.4 placeholder',
+    'experiment/2024_05_12/scan.lvm': 'x,y\n0,1\n',
+    'case/base/case.foam': 'placeholder',
+    'case/base/0/U': 'dimensions [0 1 -1 0 0 0 0];\n',
+    'case/base/0/p': 'dimensions [0 2 -2 0 0 0 0];\n',
+    'case/base/constant/polyMesh/points': '10\n(\n)\n',
+    'case/base/system/controlDict': 'FoamFile\n{\n    version 2.0;\n}\n',
+    'literature/refs/paper.pdf': '%PDF-1.4 placeholder',
     'analysis/compare.py': 'import matplotlib\n'
   },
   unknown: {
-    'данные/прибор_3/0001.sxm': 'binary-ish',
-    'данные/прибор_3/0002.sxm': 'binary-ish',
-    'данные/прибор_3/scan_params': 'gap 12.5 nm\nmode tapping\n',
+    'measurements/device_3/0001.sxm': 'binary-ish',
+    'measurements/device_3/0002.sxm': 'binary-ish',
+    'measurements/device_3/scan_params': 'gap 12.5 nm\nmode tapping\n',
     'probe/log_20240512': 'timestamp x y z\n1 2 3 4\n',
     'probe/reference_points': '1.0 2.0 3.0\n'
   }

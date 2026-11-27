@@ -1,6 +1,6 @@
 {
   "id": "numeric-openfoam",
-  "title": "Численный расчёт на OpenFOAM-подобном решателе",
+  "title": "Numerical run on an OpenFOAM-like solver",
   "kinds": {
     "extensions": {
       "cgns": "mesh",
@@ -129,8 +129,8 @@
     }
   },
   "wording": {
-    "run": "расчёт",
-    "raw-data": "входные конфигурации и геометрия",
-    "analysis": "постобработка расчёта"
+    "run": "a run",
+    "raw-data": "input configurations and geometry",
+    "analysis": "post-processing of the run"
   }
 }

@@ -1,6 +1,6 @@
 {
   "id": "custom-code",
-  "title": "Самописный код и его сборка",
+  "title": "Custom code and its build",
   "kinds": {
     "extensions": {
       "f": "code",
@@ -38,8 +38,8 @@
     "extensions": { "f90": 3, "cpp": 3, "cu": 1 }
   },
   "wording": {
-    "run": "запуск кода",
-    "raw-data": "входные файлы модели",
-    "analysis": "исходный код"
+    "run": "a code run",
+    "raw-data": "model input files",
+    "analysis": "source code"
   }
 }

@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # The suites are dependency-free on the Node side; the figure helpers
+      # need matplotlib and numpy, which smoke-figures.mjs checks in a real
+      # process rather than by inspecting source.
+      - run: python3 -m pip install --quiet matplotlib numpy
+      - run: node --version && python3 --version
+      - run: npm test

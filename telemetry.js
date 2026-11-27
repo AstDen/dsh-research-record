@@ -239,9 +239,9 @@ export function suggestions(summary, funnel) {
   for (const row of summary.tools) {
     if (row.calls >= 3 && row.errorRate >= 0.2) {
       lines.push(
-        `инструмент ${row.tool}: ${row.errors} из ${row.calls} вызовов с ошибкой ` +
-        `(${Math.round(row.errorRate * 100)}%) — доработать или уточнить описание; ` +
-        `частый текст: ${row.topError ?? '—'}`,
+        `tool ${row.tool}: ${row.errors} of ${row.calls} calls failed ` +
+        `(${Math.round(row.errorRate * 100)}%) — fix it or sharpen the description; ` +
+        `most frequent text: ${row.topError ?? '—'}`,
       )
     }
   }
@@ -249,63 +249,63 @@ export function suggestions(summary, funnel) {
   const notebook = byTool.get('notebook')
   if ((notebook?.calls ?? 0) === 0 && summary.calls >= 20) {
     lines.push(
-      `журнал не ведётся: ${summary.calls} вызовов инструментов и ни одной записи через notebook — ` +
-      'дисциплина журнала не применяется, скилл research-record не загружается или игнорируется',
+      `the journal is not kept: ${summary.calls} tool calls and not one notebook record — ` +
+      'the journal discipline is not applied, the research-record skill is not loaded or is ignored',
     )
   }
   if (funnel.counts.hypothesis > 0 && funnel.counts.observation === 0) {
     lines.push(
-      `гипотезы без наблюдений: ${funnel.counts.hypothesis} записей hypothesis и 0 observation — ` +
-      'проверить, доходят ли прогоны до записи результата',
+      `hypotheses without observations: ${funnel.counts.hypothesis} hypothesis records and 0 observation — ` +
+      'check whether runs get as far as recording a result',
     )
   }
   const check = byTool.get('figure_check')
   const spec = byTool.get('figure_spec')
   if ((check?.calls ?? 0) === 0 && (spec?.calls ?? 0) > 0) {
     lines.push(
-      `рисунки планируются, но не проверяются: figure_spec ${spec.calls} раз, figure_check 0 — ` +
-      'добавить правило «сохранил PDF → figure_check» в скилл matplotlib-figures',
+      `figures are planned but never checked: figure_spec ${spec.calls} times, figure_check 0 — ` +
+      'add the rule "saved a PDF → figure_check" to the matplotlib-figures skill',
     )
   }
   if (funnel.counts.auto > 0 && funnel.counts.auto * 3 > funnel.counts.total) {
     lines.push(
-      `журнал в основном автоматический: ${funnel.counts.auto} из ${funnel.counts.total} записей — ` +
-      'авто-заметки не заменяют method/observation, стоит подсказывать модели писать их явно',
+      `the journal is mostly automatic: ${funnel.counts.auto} of ${funnel.counts.total} records — ` +
+      'auto notes do not replace method/observation, the model should be prompted to write them explicitly',
     )
   }
   for (const route of summary.unusedRoutes.slice(0, 6)) {
-    lines.push(`маршрут не использовался: ${route.task} (${route.tools.slice(0, 4).join(', ')}) — ` +
-      'либо не нужен, либо инструмент не найден в наборе')
+    lines.push(`route never used: ${route.task} (${route.tools.slice(0, 4).join(', ')}) — ` +
+      'either it is not needed, or the tool is not in the set')
   }
   const single = summary.tools.filter((row) => row.calls === 1 && row.errors === 0)
   if (single.length > 0) {
     lines.push(
-      `${single.length} инструмент(ов) вызваны ровно один раз (${single.slice(0, 5).map((row) => row.tool).join(', ')}) — ` +
-      'часто это признак непонятного описания, а не отсутствия задачи',
+      `${single.length} tool(s) called exactly once (${single.slice(0, 5).map((row) => row.tool).join(', ')}) — ` +
+      'often this means an unclear description rather than no task',
     )
   }
   if (lines.length === 0) {
-    lines.push('сигналов для доработки не видно: ошибок мало, журнал ведётся, маршруты используются')
+    lines.push('nothing to fix is visible: few errors, the journal is kept, routes are used')
   }
   return lines
 }
 
 function formatMs(value) {
   if (value === 0) return '—'
-  if (value < 1000) return `${value} мс`
+  if (value < 1000) return `${value} ms`
   const seconds = value / 1000
-  return seconds < 60 ? `${seconds.toFixed(1)} с` : `${Math.round(seconds / 60)} мин`
+  return seconds < 60 ? `${seconds.toFixed(1)} s` : `${Math.round(seconds / 60)} min`
 }
 
 export function renderReport(summary, funnel, { workspace, routes = true } = {}) {
   const lines = []
-  lines.push(`ОТЧЁТ ОБ ИСПОЛЬЗОВАНИИ · ${basename(workspace ?? '')}`)
-  lines.push(`период: последние ${summary.days} дн · вызовов ${summary.calls} · ошибок ${summary.errors} ` +
-    `(${Math.round(summary.errorRate * 100)}%) · сессий ${summary.sessions} · инструментов ${summary.toolsUsed}`)
+  lines.push(`USAGE REPORT · ${basename(workspace ?? '')}`)
+  lines.push(`period: last ${summary.days} d · calls ${summary.calls} · errors ${summary.errors} ` +
+    `(${Math.round(summary.errorRate * 100)}%) · sessions ${summary.sessions} · tools ${summary.toolsUsed}`)
   lines.push('')
-  lines.push('ИНСТРУМЕНТЫ (вызовы · ошибки · медиана · последний раз)')
+  lines.push('TOOLS (calls · errors · median · last seen)')
   if (summary.tools.length === 0) {
-    lines.push('  пока нет данных: ни одного вызова в периоде')
+    lines.push('  no data yet: not one call in the period')
   }
   const width = Math.max(16, ...summary.tools.map((row) => row.tool.length))
   for (const row of summary.tools) {
@@ -315,20 +315,20 @@ export function renderReport(summary, funnel, { workspace, routes = true } = {})
       `${formatMs(row.p50).padStart(7)}  ${row.last.slice(0, 16).replace('T', ' ')}${flag}`)
   }
   lines.push('')
-  lines.push('ЖУРНАЛ (воронка научной работы)')
+  lines.push('JOURNAL (the research funnel)')
   lines.push(`  hypothesis ${funnel.counts.hypothesis} · method ${funnel.counts.method} · ` +
     `observation ${funnel.counts.observation} · decision ${funnel.counts.decision} · note ${funnel.counts.note}`)
-  lines.push(`  из них автоматических ${funnel.counts.auto} · записей с артефактами ${funnel.withArtifacts} · ` +
+  lines.push(`  of them automatic ${funnel.counts.auto} · records with artifacts ${funnel.withArtifacts} · ` +
     `signal ${funnel.outcomes.signal}/null ${funnel.outcomes.null}/inconclusive ${funnel.outcomes.inconclusive}/` +
     `technical-failure ${funnel.outcomes['technical-failure']}`)
   lines.push('')
   if (routes) {
-    lines.push('ЧТО ПРЕДЛОЖЕНО МЕНЯТЬ')
+    lines.push('WHAT IS SUGGESTED TO CHANGE')
     for (const line of suggestions(summary, funnel)) lines.push(`  · ${line}`)
     lines.push('')
   }
-  lines.push('ЧЕГО В ОТЧЁТЕ НЕТ (и не будет): значений аргументов, содержимого файлов, текстов')
-  lines.push('промптов и записей журнала. Только имена инструментов, имена аргументов, размеры и ошибки.')
+  lines.push('WHAT THIS REPORT DOES NOT CONTAIN (and will not): argument values, file contents, prompt')
+  lines.push('text and journal records. Only tool names, argument names, sizes and errors.')
   return lines.join('\n')
 }
 
@@ -525,8 +525,8 @@ export function apply(ctx, config) {
       if (args?.action === 'export') {
         const result = await exportReport(exec, { days, routes })
         return {
-          text: `${result.text}\n\nЗаписано:\n  ${result.mdPath}\n  ${result.jsonPath}\n` +
-            'Отчёт не содержит значений аргументов, содержимого файлов и записей журнала — его можно передать мейнтейнеру.',
+          text: `${result.text}\n\nWritten:\n  ${result.mdPath}\n  ${result.jsonPath}\n` +
+            'The report carries no argument values, file contents or journal records — it can be sent to a maintainer.',
           mdPath: result.mdPath,
           jsonPath: result.jsonPath,
           calls: result.summary.calls,
@@ -541,8 +541,8 @@ export function apply(ctx, config) {
   if (typeof commands?.register === 'function') {
     commands.register({
       name: 'usage-report',
-      description: 'Отчёт об использовании плагина: инструменты, ошибки, воронка журнала, что улучшить',
-      input: { hint: '[дней|export]' },
+      description: 'Usage report for the plugin: tools, errors, journal funnel, what to improve',
+      input: { hint: '[days|export]' },
       async handler(invocation) {
         const raw = String(invocation?.rawInput ?? '').trim()
         const exportRequested = /^export$|^экспорт$/i.test(raw)
@@ -553,7 +553,7 @@ export function apply(ctx, config) {
           ? await exportReport(exec, options)
           : await reportFor(exec, options)
         const tail = exportRequested
-          ? `\n\nЗаписано: ${result.mdPath}\n         ${result.jsonPath}`
+          ? `\n\nWritten: ${result.mdPath}\n         ${result.jsonPath}`
           : ''
         return { kind: 'success', text: result.text + tail }
       },

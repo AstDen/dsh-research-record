@@ -1,5 +1,7 @@
 # dsh-research-record
 
+[![test](https://github.com/AstDen/dsh-research-record/actions/workflows/test.yml/badge.svg)](https://github.com/AstDen/dsh-research-record/actions/workflows/test.yml)
+
 A DeepSeek Harness bundle for people who do research and have to trust their own
 numbers a month later.
 
@@ -16,16 +18,47 @@ years of work in it, and a usage report you can send to whoever maintains it.
 Nothing here talks to a server. The state lives in the project, in ordinary
 files: `.dsh/notebook/`, `.dsh/provenance/`, `.dsh/map/`, `.dsh/usage/`.
 
+Whether that is enough for someone other than you to pick it up is written down
+in [`docs/READINESS.md`](docs/READINESS.md) — including what is still missing.
+
 ## Install
 
+Not published to npm yet, so install it from the repository — either a local
+clone:
+
 ```bash
-dsh plugin --profile web add dsh-research-record
+git clone https://github.com/AstDen/dsh-research-record.git
+dsh plugin --profile web add /absolute/path/to/dsh-research-record
 dsh --profile web --dump-config | grep research-record   # eight rows must appear
 ```
 
+or let pnpm fetch it directly:
+
+```bash
+dsh plugin --profile web add git+https://github.com/AstDen/dsh-research-record.git
+```
+
+`dsh plugin` forwards its arguments to pnpm, so a path, a git URL and a tarball
+all work.
+
 Restart the profile afterwards: the tool catalogue is fixed per session.
 
-Requires DSH `>=0.2.0 <0.3.0`. No runtime dependencies.
+Requirements: DSH `>=0.2.0 <0.3.0` and Node `>=22`. Nothing else has runtime
+dependencies. The figure tools additionally need Python 3 with `matplotlib` and
+`numpy`; the rest of the bundle is pure Node.
+
+## First five minutes
+
+```text
+research_init name=demo brief="does the coating survive 400 °C?"
+notebook type=hypothesis title="the coating holds to 400 °C" body="..."
+notebook type=observation title="mass loss 2.1 % at 400 °C" body="TGA, 5 K/min" results=[{"T_C":400,"loss_pct":2.1}] execution={"state":"completed","evidence":"runs/0001/tga.csv"}
+provenance_of_file path=runs/0001/tga.csv
+notebook_verify
+```
+
+If those run, the profile is wired: the journal is written under the project's
+own `.dsh/notebook/`, not under `~/.dsh`, and the chain verifies.
 
 ## What you get
 
@@ -67,7 +100,7 @@ command, a false allow silently rewrites raw data.
 ### Starting a project
 
 ```
-/research-init Пористая труба: режим течения и Δp
+/research-init Porous pipe: flow regime and Δp
 ```
 
 Creates the skeleton for a research directory — `PROJECT.md` with the question
