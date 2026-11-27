@@ -90,6 +90,16 @@ and the host process reads its plugins once. After the restart:
 Before the restart the same profile still answered 200 to `/notebook?workspace=/tmp`
 and put new records under `~/.dsh/notebook`, which is the 0.8.1 behaviour.
 
+Two things only the live host showed, both fixed and pushed afterwards:
+
+- `provenance_of_file` printed `previous version` with a hash equal to the
+  current one. The `bash` pre-scan starts next to the command, so for a fast
+  command it hashes the file after the write; that edge is now reported without
+  a previous hash (`provenance.js`, case `M9`, 39/39 regression checks).
+- `policy_status` did not print the `allowed:` line the documents promised. It
+  does now (`guard.js`), and the fixture test asserts both the data and the
+  rendered line.
+
 ## Second instance (kept as a cheap pre-restart check)
 
 ```bash
