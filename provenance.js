@@ -33,6 +33,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { appendLine } from './lock.js'
+import { activeWorkspace, resolveWorkspace } from './notebook.js'
 import { appendAutoNote } from './notebook.js'
 
 export const name = 'research-record-provenance'
@@ -63,32 +64,6 @@ async function sha256File(path) {
     stream.on('end', accept)
   })
   return hash.digest('hex')
-}
-
-async function activeWorkspace(ctx, exec) {
-  const agentId = exec?.agent?.id
-  // 1. The harness owns the answer: the service validates the directory and
-  //    restores the original project if it disappeared. This is the same path
-  //    the built-in fs/bash tools take.
-  try {
-    const service = ctx.workingDirectory ?? (typeof ctx.get === 'function' ? ctx.get('workingDirectory') : undefined)
-    if (exec?.agent !== undefined && typeof service?.ensure === 'function') {
-      const cwd = await service.ensure(exec.agent, exec.signal)
-      if (typeof cwd === 'string' && cwd.length > 0) return cwd
-    }
-  } catch {
-    /* fall through to the session header */
-  }
-  // 2. The session header keeps the original project directory.
-  try {
-    const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
-    const session = agentId === undefined ? undefined : store?.get?.(agentId)
-    const cwd = session?.header?.cwd
-    if (typeof cwd === 'string' && cwd.length > 0) return cwd
-  } catch {
-    /* no session store — fall back to the process directory */
-  }
-  return process.cwd()
 }
 
 /** Workspace-relative POSIX form of a path argument (absolute when outside). */
@@ -387,7 +362,7 @@ export function apply(ctx, config) {
   }
 
   function workspaceFor(exec) {
-    return activeWorkspace(ctx, exec)
+    return resolveWorkspace(ctx, exec, config)
   }
 
   function snapshotOf(workspace) {
@@ -470,7 +445,7 @@ async function recordStep(exec, result) {
     const callId = String(exec?.callId ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`)
     const sessionRaw = exec?.agent?.id ?? 'global'
     const sessionId = safeId(sessionRaw)
-    const workspace = await workspaceFor(exec)
+    const { cwd: workspace } = await workspaceFor(exec)
     const args = exec?.arguments ?? {}
     const isError = result?.isError === true
     const meta = callMeta.get(callId)
@@ -660,7 +635,7 @@ async function recordStep(exec, result) {
       },
     },
     async execute(args, exec) {
-      const workspace = await workspaceFor(exec)
+      const { cwd: workspace } = await workspaceFor(exec)
       const target = typeof args?.path === 'string' ? args.path : ''
       if (target.trim().length === 0) return { ok: false, error: 'path is required' }
       return lineageReport(workspace, target, { maxHops: args?.maxHops, maxNodes: args?.maxNodes })
@@ -691,7 +666,7 @@ async function recordStep(exec, result) {
     },
     async execute(args, exec) {
       const started = Date.now()
-      const workspace = await workspaceFor(exec)
+      const { cwd: workspace } = await workspaceFor(exec)
       const entries = await readSteps(workspace, typeof args?.session === 'string' ? args.session : undefined)
       const problems = []
       const ids = new Set()

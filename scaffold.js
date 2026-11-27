@@ -479,11 +479,11 @@ function identityText(marker) {
 }
 
 export function apply(ctx, config) {
-  const workspaceOf = (exec) => activeWorkspace(ctx, exec)
+  const workspaceOf = (exec) => activeWorkspace(ctx, exec, config)
   const workspaceOfAgent = async (agent) => {
     const fromHeader = sessionWorkspace(ctx, agent?.id)
     if (fromHeader !== undefined) return fromHeader
-    return activeWorkspace(ctx, { agent })
+    return activeWorkspace(ctx, { agent }, config)
   }
 
   if (typeof ctx.systemPrompt?.section === 'function') {

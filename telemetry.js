@@ -394,7 +394,7 @@ export function apply(ctx, config) {
     if (!enabled) return
     const toolName = String(exec?.name ?? 'unknown')
     if (!recordAllTools && !toolName.startsWith('notebook') && !toolName.startsWith('figure')) return
-    const workspace = await activeWorkspace(ctx, exec)
+    const workspace = await activeWorkspace(ctx, exec, config)
     const callId = String(exec?.callId ?? '')
     const meta = callMeta.get(callId)
     callMeta.delete(callId)
@@ -465,7 +465,7 @@ export function apply(ctx, config) {
   }
 
   async function reportFor(exec, { days = 30, routes = true } = {}) {
-    const workspace = await activeWorkspace(ctx, exec)
+    const workspace = await activeWorkspace(ctx, exec, config)
     const { file } = await usagePath(workspace)
     const events = parseEvents(await readEventsFile(file))
     const summary = summarizeEvents(events, { days })

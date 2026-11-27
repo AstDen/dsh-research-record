@@ -99,31 +99,89 @@ function safeSessionId(value) {
   return text.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 120) || 'global'
 }
 
-/** Exported for the scaffold module: one workspace resolution for the whole bundle. */
-export async function activeWorkspace(ctx, exec) {
+/**
+ * Where the project record lives, and how that was decided.
+ *
+ * The chain is deliberately explicit, because every silent fallback in it writes
+ * a journal into the wrong directory: a record that lands in
+ * `node_modules/.bin/.dsh/notebook` looks written — the tool prints a hash — and
+ * is lost the moment the launcher updates. Sources, in order:
+ *
+ * 1. `workingDirectory.ensure(agent)` — the harness validates and restores it,
+ *    the same path the built-in fs/bash tools take;
+ * 2. the durable session header (`cwd` at session creation);
+ * 3. `config.workspace` of this bundle (a profile-level default);
+ * 4. `DSH_RESEARCH_WORKSPACE`;
+ * 5. `process.cwd()` — last resort, reported as `source: 'process'`.
+ *
+ * A directory inside `node_modules` is refused unless it came from an explicit
+ * configuration: that is the launcher's own tree, never a research project.
+ */
+export async function resolveWorkspace(ctx, exec, config) {
   const agentId = exec?.agent?.id
-  // 1. The harness owns the answer: the service validates the directory and
-  //    restores the original project if it disappeared. This is the same path
-  //    the built-in fs/bash tools take.
+  let cwd
+  let source = 'process'
+
+  // 1. The harness owns the answer.
   try {
     const service = ctx.workingDirectory ?? (typeof ctx.get === 'function' ? ctx.get('workingDirectory') : undefined)
     if (exec?.agent !== undefined && typeof service?.ensure === 'function') {
-      const cwd = await service.ensure(exec.agent, exec.signal)
-      if (typeof cwd === 'string' && cwd.length > 0) return cwd
+      const resolved = await service.ensure(exec.agent, exec.signal)
+      if (typeof resolved === 'string' && resolved.length > 0) {
+        cwd = resolved
+        source = 'workingDirectory'
+      }
     }
   } catch {
     /* fall through to the session header */
   }
+
   // 2. The session header keeps the original project directory.
-  try {
-    const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
-    const session = agentId === undefined ? undefined : store?.get?.(agentId)
-    const cwd = session?.header?.cwd
-    if (typeof cwd === 'string' && cwd.length > 0) return cwd
-  } catch {
-    /* no session store — fall back to the process directory */
+  if (cwd === undefined) {
+    try {
+      const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+      const session = agentId === undefined ? undefined : store?.get?.(agentId)
+      const headerCwd = session?.header?.cwd
+      if (typeof headerCwd === 'string' && headerCwd.length > 0) {
+        cwd = headerCwd
+        source = 'session'
+      }
+    } catch {
+      /* no session store */
+    }
   }
-  return process.cwd()
+
+  // 3. A profile-level default for this bundle.
+  if (cwd === undefined && typeof config?.workspace === 'string' && config.workspace.length > 0) {
+    cwd = config.workspace
+    source = 'config'
+  }
+
+  // 4. An environment override, for a process whose session header is missing.
+  if (cwd === undefined && typeof process.env.DSH_RESEARCH_WORKSPACE === 'string' && process.env.DSH_RESEARCH_WORKSPACE.length > 0) {
+    cwd = process.env.DSH_RESEARCH_WORKSPACE
+    source = 'env'
+  }
+
+  // 5. Last resort.
+  if (cwd === undefined) cwd = process.cwd()
+
+  const explicit = source === 'config' || source === 'env'
+  if (!explicit && /[\\/]node_modules[\\/]/.test(cwd)) {
+    throw new Error(
+      `research record: the project directory resolved to ${cwd}, which is the launcher's own tree. ` +
+        'Writing a journal there loses it on the next update. ' +
+        'Set `workspace` in the bundle configuration, or DSH_RESEARCH_WORKSPACE, to the project directory.',
+    )
+  }
+
+  return { cwd, source }
+}
+
+/** Exported for the scaffold module: one workspace resolution for the whole bundle. */
+export async function activeWorkspace(ctx, exec, config) {
+  const { cwd } = await resolveWorkspace(ctx, exec, config)
+  return cwd
 }
 
 /**
@@ -441,8 +499,9 @@ export function apply(ctx, config) {
   const digestCache = new Map()
   const refreshTimer = new Map()
 
+  /** Project directory plus how it was chosen; the tool prints both. */
   function workspaceFor(exec) {
-    return activeWorkspace(ctx, exec)
+    return resolveWorkspace(ctx, exec, config)
   }
 
   async function buildDigest(workspace) {
@@ -601,6 +660,7 @@ export function apply(ctx, config) {
         if (value?.ok !== true) return [{ type: 'text', text: `notebook: rejected — ${value?.error ?? 'unknown error'}` }]
         const record = value.record
         const lines = [`notebook: ${record.type} ${record.id} "${record.title}"`, `hash:     ${record.hash}`, `prevHash: ${record.prevHash}`]
+        if (value.journal) lines.push(`journal:  ${value.journal}${value.workspaceSource ? ` (workspace from ${value.workspaceSource})` : ''}`)
         if (record.execution?.state) lines.push(`execution: ${record.execution.state}${record.execution.evidence ? ` (${record.execution.evidence})` : ''}`)
         if (Array.isArray(record.artifacts) && record.artifacts.length > 0) {
           for (const artifact of record.artifacts) lines.push(`artifact: ${artifact.path} ${artifact.status ?? ''} ${artifact.sha256 ?? ''}`.trim())
@@ -613,7 +673,7 @@ export function apply(ctx, config) {
       },
     },
     async execute(args, exec) {
-      const workspace = await workspaceFor(exec)
+      const { cwd: workspace, source } = await workspaceFor(exec)
       const sessionId = safeSessionId(exec?.agent?.id ?? 'global')
 
       const type = String(args?.type ?? '')
@@ -765,7 +825,7 @@ export function apply(ctx, config) {
         )
       }
       scheduleDigest(workspace)
-      return { ok: true, record, warnings, digest: record.hash }
+      return { ok: true, record, warnings, digest: record.hash, journal: file, workspace, workspaceSource: source }
     },
   })
 
@@ -817,7 +877,7 @@ export function apply(ctx, config) {
       },
     },
     async execute(args, exec) {
-      const workspace = await workspaceFor(exec)
+      const { cwd: workspace } = await workspaceFor(exec)
       const sessionId = safeSessionId(exec?.agent?.id ?? 'global')
       const action = args?.action === 'read' ? 'read' : 'search'
       const project = await projectEntries(workspace)
@@ -906,7 +966,7 @@ export function apply(ctx, config) {
       },
     },
     async execute(args, exec) {
-      const workspace = await workspaceFor(exec)
+      const { cwd: workspace } = await workspaceFor(exec)
       const only = typeof args?.session === 'string' ? `${safeSessionId(args.session)}.jsonl` : undefined
       const result = await verifyJournal(workspace, only)
       if (result.ok === true) scheduleDigest(workspace)

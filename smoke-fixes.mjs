@@ -145,5 +145,37 @@ check('hash chain still verifies with an auto note', verify.ok === true, JSON.st
 const manual = await record(leadId, { type: 'decision', title: 'project A decision', body: 'why' })
 check('manual record still appends with a verified hash', manual.ok === true && /^[0-9a-f]{64}$/.test(manual.record.hash))
 
+// --- fix 4: the project directory, not the launcher's tree ------------------
+// A journal written to `node_modules/.bin/.dsh` is a record that disappears on
+// the next launcher update, and the tool still prints a hash. Every source in
+// the chain is checked, plus the refusal.
+{
+  const services = (cwd) => ({ workingDirectory: { ensure: async () => cwd } })
+  const fromService = await notebook.resolveWorkspace(services('/tmp/project-a'), execOf(leadId, 'notebook', {}), undefined)
+  check('workspace comes from the harness service first', fromService.cwd === '/tmp/project-a' && fromService.source === 'workingDirectory')
+
+  const fromHeader = await notebook.resolveWorkspace({ sessions: { get: () => ({ header: { cwd: '/tmp/project-b' } }) } }, execOf(leadId, 'notebook', {}), undefined)
+  check('workspace falls back to the session header', fromHeader.cwd === '/tmp/project-b' && fromHeader.source === 'session')
+
+  const fromConfig = await notebook.resolveWorkspace({}, execOf(leadId, 'notebook', {}), { workspace: '/tmp/project-c' })
+  check('workspace honours the bundle configuration', fromConfig.cwd === '/tmp/project-c' && fromConfig.source === 'config')
+
+  process.env.DSH_RESEARCH_WORKSPACE = '/tmp/project-d'
+  const fromEnv = await notebook.resolveWorkspace({}, execOf(leadId, 'notebook', {}), undefined)
+  check('workspace honours DSH_RESEARCH_WORKSPACE', fromEnv.cwd === '/tmp/project-d' && fromEnv.source === 'env')
+  delete process.env.DSH_RESEARCH_WORKSPACE
+
+  let refused = false
+  try {
+    await notebook.resolveWorkspace({ workingDirectory: { ensure: async () => '/home/x/.npm/_npx/abc/node_modules/.bin' } }, execOf(leadId, 'notebook', {}), undefined)
+  } catch (error) {
+    refused = /node_modules/.test(String(error?.message)) && /workspace/.test(String(error?.message))
+  }
+  check('a launcher tree inside node_modules is refused', refused)
+
+  const explicit = await notebook.resolveWorkspace({}, execOf(leadId, 'notebook', {}), { workspace: '/home/x/project/node_modules/real' })
+  check('an explicitly configured path is not second-guessed', explicit.cwd === '/home/x/project/node_modules/real' && explicit.source === 'config')
+}
+
 console.log(`\n${failures.length === 0 ? 'all fixes hold' : `${failures.length} failed: ${failures.join(', ')}`}`)
 process.exit(failures.length === 0 ? 0 : 1)

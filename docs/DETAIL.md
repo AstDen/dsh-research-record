@@ -358,6 +358,14 @@ automatic artifact notes), and for telemetry `enabled`, `recordAllTools` (set
 `false` to record only the record/figure tools) and `maxFileBytes` (rotation at
 5 MB by default). Everything else lives in `policy.json`.
 
+`workspace` names the project directory when the harness cannot: it is read from
+the module's slice, and a bundle-level `workspace` is inherited by every slice
+(`index.js`). The resolution order is `workingDirectory.ensure` → session header
+→ `workspace` → `DSH_RESEARCH_WORKSPACE` → `process.cwd()`, and the answer is
+printed by the `notebook` tool as `journal: <path> (workspace from <source>)`.
+A directory inside `node_modules` is refused unless it came from `workspace` or
+the environment variable: that is the launcher's tree, never a project.
+
 ## Decisions worth knowing
 
 1. **Four patch rows, not one.** `--dump-config` must show all four plugins,
@@ -371,16 +379,21 @@ automatic artifact notes), and for telemetry `enabled`, `recordAllTools` (set
    it errs on the side of denying the obvious writes (`> file`, `cp`, `rm`,
    `sed -i`) and no more. A miss is a policy gap, not a silent allow of
    everything.
-5. **The digest follows the session, not the process.** A prompt section that
+5. **A record that cannot be placed is an error.**
+   resort, and the one that put a journal inside `node_modules/.bin` for an `npx`
+   launch. It stays in the chain because a plain `node` script has nothing else,
+   but a `node_modules` answer is refused and the tool prints the path it used,
+   so the failure is visible on the first record rather than after a lost month.
+6. **The digest follows the session, not the process.** A prompt section that
    reads `process.cwd()` shows the harness's own journal to every project; the
    section resolves the agent from its assembly context and reads that session's
    project directory. An unknown scope renders nothing — a missing digest costs
    prompt space, a foreign one corrupts the reasoning.
-6. **The scaffold writes a marker, not a system prompt.** The project rules live
+7. **The scaffold writes a marker, not a system prompt.** The project rules live
    in the project's own `AGENTS.md` plus a small marker-driven prompt section, so
    they travel with the directory (git, archive, another machine) instead of with
    the plugin installation.
-7. **Automatic notes are stubs on purpose.** They carry paths and hashes, never
+8. **Automatic notes are stubs on purpose.** They carry paths and hashes, never
    an interpretation: a machine guessing what a figure means is worse than a
    blank line the model is asked to fill.
 9. **Telemetry records shapes, not content.** A report that can be sent to a
@@ -390,7 +403,7 @@ automatic artifact notes), and for telemetry `enabled`, `recordAllTools` (set
    argument values. The report is a file the user exports on purpose, not a
    dashboard that watches them.
 
-8. **The guard errs towards refusing.** The bash classifier scans tokens, not a
+10. **The guard errs towards refusing.** The bash classifier scans tokens, not a
    shell grammar, so a command whose *text* mentions a protected path (a heredoc
    that writes a `data/raw` example) is denied too. A false denial costs one
    retried command; a false allow silently rewrites raw data, so the heuristic is
@@ -435,10 +448,10 @@ move gets a `decision` record plus a `notebook_verify`.
 
 Two decisions worth keeping:
 
-10. **The map is written next to the project, not into the profile.** State belongs
+11. **The map is written next to the project, not into the profile.** State belongs
     to the project: `.dsh/map/` travels with the directory, a colleague who copies
     it gets the map, and deleting the profile loses nothing.
-11. **Markers are opt-in.** `markers: true` writes a small `.dsh-map.json` into
+12. **Markers are opt-in.** `markers: true` writes a small `.dsh-map.json` into
     every visited directory so the graph survives a `cd`, but it is a visible
     change inside the owner's folders — the skill tells the model to ask first.
 
@@ -485,10 +498,10 @@ does not exist yet.
 
 Two decisions:
 
-12. **Text sniffing is not a finding.** An unknown file that reads as text stays
+13. **Text sniffing is not a finding.** An unknown file that reads as text stays
     `other`: counting it as `text` would silently erase the very names the owner
     needs to see.
-13. **A field pattern is bounded by its directory.** `^[A-Za-z][A-Za-z0-9_()+-]{0,20}$`
+14. **A field pattern is bounded by its directory.** `^[A-Za-z][A-Za-z0-9_()+-]{0,20}$`
     is applied only inside a directory the pack recognised as a field directory
     (time step, region). A file called `notes` in `src/` stays unknown.
 

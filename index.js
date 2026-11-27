@@ -28,7 +28,14 @@ export const inject = ['tools', 'systemPrompt']
 function slice(config, key) {
   if (config === undefined || config === null || typeof config !== 'object') return undefined
   const value = config[key]
-  return value !== undefined && value !== null && typeof value === 'object' ? value : undefined
+  const own = value !== undefined && value !== null && typeof value === 'object' ? value : undefined
+  // `workspace` is a bundle-wide default: a module that has no slice still needs
+  // to know where the record lives, so the root value is inherited unless the
+  // module names its own directory.
+  const root = typeof config.workspace === 'string' && config.workspace.length > 0 ? { workspace: config.workspace } : {}
+  if (own === undefined) return Object.keys(root).length > 0 ? root : undefined
+  if (own.workspace === undefined && root.workspace !== undefined) return { ...own, workspace: root.workspace }
+  return own
 }
 
 export function apply(ctx, config) {

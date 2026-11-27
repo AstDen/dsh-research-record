@@ -1,3 +1,23 @@
+## 0.8.1 — the record lands in the project, or not at all
+
+- **Fixed: the journal could be written into the launcher's tree.** A session
+  whose `workingDirectory` service and session header both came back empty fell
+  back to `process.cwd()`, which for a `npx` launch is
+  `node_modules/.bin` — the journal (and provenance, and usage log) landed there,
+  looked written, and would vanish on the next launcher update. Measured live:
+  one hypothesis record ended up in
+  `~/.npm/_npx/<hash>/node_modules/.bin/.dsh/notebook/`.
+- `resolveWorkspace(ctx, exec, config)` replaces the silent fallback with a named
+  chain — `workingDirectory.ensure` → `session.header.cwd` → `config.workspace` →
+  `DSH_RESEARCH_WORKSPACE` → `process.cwd()` — returns `{cwd, source}`, and
+  **throws** when the answer is inside `node_modules` unless it came from
+  configuration.
+- The `notebook` tool now prints `journal: <path> (workspace from <source>)`, so a
+  wrong resolution is visible on the first record instead of after a lost month.
+- `provenance.js` no longer keeps its own copy of the resolver; `scaffold`,
+  `survey`, `telemetry` pass the bundle configuration through, and `index.js`
+  makes a bundle-level `workspace` the default for every slice.
+
 ## 0.8.0 — the same classifier for someone else's project
 
 - Universal layer `packs.js`: file kinds and directory roles are derived from

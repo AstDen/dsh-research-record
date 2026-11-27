@@ -765,7 +765,7 @@ export function apply(ctx, config) {
       render: (_args, value) => [{ type: 'text', text: `${value.mapText}\n\n${value.factsText ?? ''}` }],
     },
     async execute(args, exec) {
-      const workspace = await activeWorkspace(ctx, exec)
+      const workspace = await activeWorkspace(ctx, exec, config)
       const target = typeof args?.path === 'string' && args.path.length > 0 ? resolve(workspace, args.path) : workspace
       const map = await walkTree(target, {
         markers: args?.markers === true,
@@ -814,7 +814,7 @@ export function apply(ctx, config) {
       render: (_args, value) => [{ type: 'text', text: value.text ?? '' }],
     },
     async execute(args, exec) {
-      const workspace = await activeWorkspace(ctx, exec)
+      const workspace = await activeWorkspace(ctx, exec, config)
       const mode = ['as-is', 'light', 'restructure'].includes(args?.mode) ? args.mode : 'light'
       const result = await adoptProject(workspace, {
         root: typeof args?.path === 'string' && args.path.length > 0 ? resolve(workspace, args.path) : workspace,
