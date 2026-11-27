@@ -169,10 +169,15 @@ session project instead of the home directory, `notebook` writes to
 - **`docs/READINESS.md`** — what works for an outside user, what does not, and
   what to add before advertising the bundle (a package or tarball, `SECURITY.md`,
   an issue template).
-- **`docs/releases/v0.8.2.md`** and **`scripts/github-metadata.sh`** — the release
-  notes and the script that sets the repository description, homepage, topics and
-  the GitHub release from them (it prints what to paste instead of failing when no
-  token is present).
+- **`docs/releases/v0.8.2.md`**, **`scripts/github-metadata.sh`** and
+  **`scripts/store-github-token.sh`** — the release notes, the script that sets the
+  repository description, homepage, topics and the GitHub release from them (it
+  prints what to paste instead of failing when no token is present), and the helper
+  that stores a token in a 600-mode file from a hidden prompt. The metadata script
+  reads `GH_TOKEN` or that file (`~/.config/dsh-research-record/gh-token`, override
+  with `GH_TOKEN_FILE`), refuses a mode looser than 600, and verifies the token
+  against `GET /user` before it changes anything — so a secret never has to appear
+  on a command line, where the shell would keep it in its history.
 - **No bytecode in the repository.** Five `figurelib/__pycache__/*.pyc` files had
   been committed — `.gitignore` lists `__pycache__/`, but an ignore rule does not
   apply to a file already tracked. They are removed from the index and stay out.

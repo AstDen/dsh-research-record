@@ -88,7 +88,11 @@ install from a registry package, because there is none.
   minutes”.
 - `docs/releases/v0.8.2.md` — release notes used to create the GitHub release.
 - `scripts/github-metadata.sh` — sets description, homepage, topics and releases;
-  with no token it prints what to paste instead of failing.
+  with no token it prints what to paste instead of failing. The token comes from
+  `GH_TOKEN` or from a 600-mode file (`~/.config/dsh-research-record/gh-token`,
+  `GH_TOKEN_FILE` overrides), and a looser mode is refused;
+  `scripts/store-github-token.sh` writes that file from a hidden prompt, so the
+  token never reaches the shell history.
 - English throughout, except the localisation layer and data aliases (locale
   files, the client's `ru` dictionary, bilingual unit/letter tables, the guard's
   bilingual confirmation prompt, the `экспорт` alias and the Russian folder-name

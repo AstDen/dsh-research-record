@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Fill in the GitHub "About" sidebar and publish the releases of this bundle.
 #
-#   GH_TOKEN=ghp_xxx ./scripts/github-metadata.sh            # About + every release note
-#   GH_TOKEN=ghp_xxx ./scripts/github-metadata.sh v0.8.2     # one version
+#   ./scripts/github-metadata.sh            # About + every release note
+#   ./scripts/github-metadata.sh v0.8.2     # one version
 #
 # A fine-grained token needs "Administration: read and write" (description and
 # topics) and "Contents: read and write" (releases); a classic token needs the
@@ -10,6 +10,13 @@
 # overwritten with the values below, and a release is only created when the tag
 # exists and no release for it exists yet. Without a token the script prints the
 # same values so they can be pasted into the web interface instead.
+#
+# The token comes from GH_TOKEN, or from a 600-mode file so it never has to be
+# typed into a command line (where the shell would keep it in its history):
+#
+#   ~/.config/dsh-research-record/gh-token      (override with GH_TOKEN_FILE)
+#
+# The file is only read when its mode is 600 or 400; anything looser is refused.
 set -euo pipefail
 
 OWNER="AstDen"
@@ -24,13 +31,36 @@ printf 'About (paste as repository description):\n  %s\n\n' "$DESCRIPTION"
 printf 'Homepage:\n  %s\n\n' "$HOMEPAGE"
 printf 'Topics:\n  %s\n\n' "${TOPICS[*]}"
 
-if [ -z "${GH_TOKEN:-}" ]; then
-  cat <<'EOF'
-No GH_TOKEN in the environment, so nothing was sent. Two ways forward:
+TOKEN_FILE="${GH_TOKEN_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dsh-research-record/gh-token}"
+token_source="GH_TOKEN from the environment"
 
-  a) create a fine-grained token on this repository with "Administration: read
-     and write" and "Contents: read and write", then run:
-       GH_TOKEN=... ./scripts/github-metadata.sh
+if [ -z "${GH_TOKEN:-}" ] && [ -f "$TOKEN_FILE" ]; then
+  mode="$(stat -c '%a' "$TOKEN_FILE" 2>/dev/null || printf '???')"
+  case "$mode" in
+    600|400)
+      GH_TOKEN="$(tr -d '\r\n' < "$TOKEN_FILE")"
+      token_source="$TOKEN_FILE (mode $mode)"
+      ;;
+    *)
+      die "refusing to read $TOKEN_FILE: mode $mode, expected 600 — run: chmod 600 \"$TOKEN_FILE\""
+      ;;
+  esac
+fi
+
+if [ -z "${GH_TOKEN:-}" ]; then
+  cat <<EOF
+No token, so nothing was sent. Two ways forward:
+
+  a) store a fine-grained token on this repository with "Administration: read
+     and write" and "Contents: read and write" — the token never enters the
+     shell history when you let the script read it:
+
+       ./scripts/store-github-token.sh
+
+     then just run ./scripts/github-metadata.sh — it reads
+     $TOKEN_FILE
+     (mode 600 or 400 required; GH_TOKEN_FILE overrides the path).
+
   b) set the description, homepage and topics by hand (Settings → About, the
      pencil icon) and create each release from docs/releases/<version>.md.
 
@@ -58,6 +88,20 @@ api() {
 }
 
 json_str() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+
+whoami="$(api GET /user)"
+login="$(printf '%s' "$whoami" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("login", ""))' 2>/dev/null || true)"
+if [ -z "$login" ]; then
+  reason="$(printf '%s' "$whoami" | python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("no JSON answer")
+    raise SystemExit
+print(d.get("message") or d.get("status") or "unexpected answer")' 2>/dev/null || true)"
+  die "GitHub rejected the token from $token_source: ${reason:-unexpected answer}"
+fi
+printf 'Token: %s — authenticated as %s\n\n' "$token_source" "$login"
 
 printf 'About: setting description and homepage…\n'
 about="{\"description\": $(json_str "$DESCRIPTION"), \"homepage\": $(json_str "$HOMEPAGE")}"
