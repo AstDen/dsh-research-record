@@ -1,3 +1,138 @@
+## 0.8.2 — the fixes the audit asked for, each with a test that failed before it
+
+An external audit of 0.8.1 (commit `57c0cc8`) found one blocker, eight high and
+fifteen medium defects; every one is reproduced by a script first, then fixed.
+The full report is `dsh-research-record-audit/report.md`, the plan is
+`fix-plan.md`, the acceptance evidence is `retest-report.md`.
+
+### The test infrastructure that would have caught them
+
+- `fixtures/ctx.mjs` — a cordis-faithful context: reading a service the plugin
+  did not declare in `inject` **throws**, exactly like `ReflectService`. The old
+  flat fake returned `undefined` instead, which is why the worst defect of 0.8.1
+  passed 365 green checks.
+- `smoke-cordis.mjs` — the same claim proved on the real `@deepseek-ai/cordis`
+  loader (services registered as `Service` subclasses, because `app.provide` of a
+  plain object does not reproduce the throwing getter).
+- `smoke-regress.mjs` — one case per audit finding (`B1`, `H2`–`H8`, `M1`–`M9`,
+  `M13`, `M14`); `npm test` runs it together with the eight existing suites.
+
+### Blocking
+
+- **`B1`: a journal with a torn tail was silently appended to.** One `truncate`
+  left half a line, the next `notebook` returned `ok: true`, and every later
+  record was unreachable — `notebook_verify` reported "line 1 is not valid JSON".
+  Now `appendRecordOnce` refuses (`TORN_TAIL`, with the byte offset) and
+  `notebook_verify({ repair: true })` trims to the last consistent record after
+  copying the file to `<journal>.bak-<timestamp>`.
+
+### High
+
+- **`H1`: `ctx.workingDirectory ?? ctx.get('workingDirectory')` never reached the
+  right branch.** cordis throws on the *property read*, so the fallback was dead
+  code and nine places resolved the wrong workspace — the live symptom was a
+  journal written into `/home/claster` instead of the project. New
+  `services.js#getService` tries `ctx.get(name)` first and only then the property.
+- **`H2`: twelve parallel `notebook` calls broke the hash chain.** `appendRecordOnce`
+  held the lock and then called `appendLine`, which takes the same lock, waited
+  out its retries and finally wrote *without* it. The record is now appended with
+  `appendFile` inside the single lock.
+- **`H3`: a forged record passed `notebook_search`.** `action: "read"` compared
+  `expectedDigest` with the stored `hash` field instead of recomputing it, so a
+  hand-edited title came back with `ok: true` while `notebook_verify` saw the
+  mismatch. The read now recomputes and reports both digests.
+- **`H4`: survey markers escaped the project.** `markerName: "../OUTSIDE.md"`
+  overwrote a file above the project; `markerName: "notes.md"` overwrote
+  `sub/notes.md`. Markers must be bare file names and are written with
+  `flag: "wx"`, so an existing file is reported as skipped, never replaced.
+- **`H5`: adoption overwrote the owner's `literature/_INDEX.md`.** Adoption never
+  overwrites: the index is written only when absent (`created`), otherwise it is
+  kept and reported (`kept`).
+- **`H6`: two sessions looked like a time paradox.** The monotonicity check used
+  one `previousTimestamp` for every session, so an older record in a second
+  session produced `ok: false` with a phantom "goes back in time". The state is
+  now per session (`previousBySession`), and the message names the session.
+- **`H7`: the figure check could not see a Type 3 font.** `_fonts` read only
+  `/BaseFont` (a font may be named and never embedded), and pdffonts output was
+  split on single spaces, so `"Type 3"` arrived as `"Type"` and the comparison
+  never matched. Now `/FontFile*` presence and `/Subtype /Type3` are read from
+  the PDF bytes, and the pdffonts columns are split on runs of spaces.
+- **`H8`: the HTTP panels read the journals of any directory.** `/notebook` and
+  `/provenance` took `?workspace=` and called `process.cwd()` as the default.
+  `panelWorkspace` accepts only a workspace a live session works in (or the host
+  directory) and answers **403** otherwise.
+
+### Medium
+
+- **`M1`: the guard classified shell commands by substring.** `rm -r -f user_data`
+  and `rm -Rf data` were allowed, `python3 analyze.py data/raw.csv` was denied
+  (reading!), and `sed -n 1p` was denied too. The classifier now reads the verb
+  (`rm`, `mv`, `cp`, `dd`, …) and treats its non-flag arguments as write targets;
+  an interpreter counts as a writer only with `-i`.
+- **`M2`: the scaffold protected its own output.** It wrote
+  `protectedPaths: ["data/raw/**", "data/**"]`, so `data/derived/` — the place its
+  own `AGENTS.md` sends the work — was refused. Both now agree, and the guard has
+  an `allowPaths` exemption list.
+- **`M3`: `max_files` did not stop the walk.** The limit ended one directory, not
+  the traversal. The walk breaks at the limit and reports `truncated: true`.
+- **`M4`: adoption wrote outside the workspace.** `root` was used unresolvable
+  against the workspace; a path outside it now fails with a named error.
+- **`M5`: a malformed project pack disabled both survey tools.** `nameMatches`
+  went through `new RegExp` without the `safeRegExp` helper that the same file
+  already had; an unparsable pattern now skips one signature instead of throwing,
+  and no longer degrades into "match everything".
+- **`M6`: a failed write recorded the old file as its output.** The provenance
+  hook hashed the path after an `isError` write — so the step claimed the previous
+  content as its result. A failed write records a note and no edge.
+- **`M7`: `steps.jsonl` stored file content.** `write.content`,
+  `edit.old_string`/`new_string` went into the journal verbatim (up to 4 KiB
+  each), which a report or a commit then carries around. Content is now recorded
+  as `{ redacted: true, chars: N }`; other long arguments keep a 1 KiB preview.
+- **`M8`: `touch -r` hid a change.** Change detection compared size and mtime, so
+  restoring the timestamp made a modified file look untouched. ctime is now part
+  of the fingerprint.
+- **`M9`: the first `bash` after start saw no outputs.** The "before" snapshot was
+  taken lazily when the result arrived, i.e. after the command. It is now started
+  on `tool/call` and awaited by the step; a file whose mtime falls inside the
+  call window is treated as written by the call even if the asynchronous pre-scan
+  already saw it (5 ms of slack covers ISO-millisecond vs sub-millisecond mtime).
+- **`M10`: the lock gave up and wrote unlocked.** `withAppendLock` ran the body
+  without a lock after two seconds of retries, which is how `H2` broke the chain.
+  It now throws `LOCK_TIMEOUT` instead, releases only its own token, and waits up
+  to 60 s.
+- **`M11`: no input limit on `notebook`.** A 5 MiB body was accepted. The input is
+  capped at 512 KiB and an aborted turn is refused before the write.
+- **`M13`: `research_stack` with `level: "all"` printed only the footer**, and
+  install commands lost local path specs. `"all"` now means every level (with the
+  "do not install" and "does not exist" blocks), registry packages exclude local
+  checkouts, and a local checkout is reported as a manual command instead of a
+  name `dsh plugin add` cannot resolve.
+- **`M14`: the telemetry sanitiser missed Windows paths.** The pattern required
+  two literal backslashes, so `C:\Users\bob\…` survived into the report.
+  `/home/<user>`, `/Users/<user>` and both Windows forms now collapse.
+- **`M15`: `research_init` wrote into any directory it was given**, appended to an
+  existing form without saying so, and `force: true` replaced a hand-edited
+  `PROJECT.md` with no copy of the old text. The tool now refuses a path outside
+  the session workspace (the same containment the panels and the survey use),
+  reports a modified form as `updated` instead of inventing the label
+  `PROJECT.md (вопрос)`, and keeps `<form>.bak-<timestamp>` before a forced
+  rewrite.
+
+### Small
+
+- The search tokenizer no longer drops CJK text, and `limit: "5"` is read as five
+  rather than silently ignored.
+- `survey` skips `.git` without skipping `.github`, and reports skipped symlinks
+  instead of dropping them silently.
+- The scaffold reports real paths only: the label `PROJECT.md (вопрос)` became a
+  journal artifact that could never be hashed. A record's artifacts are also
+  stat-checked, so a non-file can never enter the journal again.
+- `figurelib/table.py` works without pandas.
+- `figure_spec` puts a single panel on the 90 mm column by default (it was
+  returning a 190 mm sheet with the legend outside, contradicting the documented
+  contract) and keeps the legend inside the panel.
+- `__pycache__/`, `.dsh/` and `.tmp/` are gitignored.
+
 ## 0.8.1 — the record lands in the project, or not at all
 
 - **Fixed: the journal could be written into the launcher's tree.** A session

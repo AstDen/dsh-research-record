@@ -1,6 +1,6 @@
 {
   "name": "dsh-research-record",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Hash-chained research notebook, file provenance graph, protected-path guard, research scaffold, journal figure tools, a privacy-preserving usage report and universal project adoption for DeepSeek Harness",
   "type": "module",
   "main": "index.js",
@@ -40,6 +40,10 @@
     "packs",
     "packs.js"
   ],
+  "scripts": {
+    "test": "node smoke.mjs && node smoke-client.mjs && node smoke-figures.mjs && node smoke-adopt.mjs && node smoke-usage.mjs && node smoke-stack.mjs && node smoke-scaffold.mjs && node smoke-fixes.mjs && node smoke-cordis.mjs && node smoke-regress.mjs",
+    "test:regress": "node smoke-regress.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

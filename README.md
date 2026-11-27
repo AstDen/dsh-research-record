@@ -33,9 +33,9 @@ Requires DSH `>=0.2.0 <0.3.0`. No runtime dependencies.
 
 | Tool | What it does |
 | --- | --- |
-| `notebook` | append a `hypothesis`, `method`, `observation`, `decision` or `note`; immutable records, corrections through `supersedes` |
+| `notebook` | append a `hypothesis`, `method`, `observation`, `decision` or `note`; immutable records, corrections through `supersedes`; one input is capped at 512 KiB |
 | `notebook_search` | search every journal in the project, read one record, refuse a stale digest |
-| `notebook_verify` | recompute the whole hash chain and name the first broken line |
+| `notebook_verify` | recompute the whole hash chain and name the first broken line; `repair: true` trims a torn tail after copying the file to `.bak-<timestamp>` |
 | `provenance_of_file` | walk the graph upwards: which step produced this file, from which inputs, `observed` or `inferred` |
 | `provenance_verify` | check the integrity of the provenance journal and re-hash recorded outputs |
 
@@ -50,14 +50,19 @@ did not read.
 ### The guard
 
 `.dsh/policy.json` protects input paths (`data/raw/**`, `data/**` by default,
-editable per project). Writes there are denied for `write`, `edit` and mutating
+editable per project) and lists `allowPaths` exemptions — the scaffold ships
+`data/derived/**` and `derived/**`, because derived work is what the project is
+for. Writes into a protected path are denied for `write`, `edit` and mutating
 `bash`; `rm -rf`, `git reset --hard`, `find -delete`, `dd`, `shred` ask for
 confirmation. Every denial is appended to `.dsh/guard/blocked.jsonl`, and
-`policy_status` shows what was blocked and why.
+`policy_status` shows what was blocked and why, including the exemption list.
 
-The bash classifier scans tokens, not a shell grammar, so a command whose *text*
-mentions a protected path can be denied too. That is deliberate: a false denial
-costs one retried command, a false allow silently rewrites raw data.
+The bash classifier reads the verb (`rm`, `mv`, `cp`, `dd`, …) and treats its
+non-flag arguments as write targets; an interpreter such as `python3` counts as
+a writer only when given `-i`, so reading a raw file is allowed. It is still a
+token scan, not a shell grammar: a command whose *text* mentions a protected path
+can be refused as a write. That is deliberate — a false denial costs one retried
+command, a false allow silently rewrites raw data.
 
 ### Starting a project
 
@@ -126,8 +131,10 @@ English), `bilingual_loop` writing `figure_ru.pdf` and `figure_en.pdf` as two
 separate files, and `save_data_table` putting the plotted numbers in a text file
 next to the figure.
 
-`figure_spec` plans a figure before it is drawn; `figure_check` reads the PDF back
-(page size from the MediaBox, embedded fonts from `/BaseFont`, Type 3 warning) so
+`figure_spec` plans a figure before it is drawn — one panel defaults to the 90 mm
+column, and `figure_spec` says so before anything is drawn. `figure_check` reads
+the PDF back: page size from the MediaBox, whether the font program is embedded
+(`/FontFile*`) and whether any font is a Type 3 outline (`/Subtype /Type3`), so
 "it looked fine" is not the acceptance criterion.
 
 ### Usage report
@@ -175,6 +182,11 @@ prints the exact command; it installs only with `confirm: true`.
 - `restructure` never moves anything itself, by design.
 - Adoption is bounded: when the walk hits `max_files`, the map says so and the
   plan calls itself preliminary.
+- The journal is one JSONL file read end to end: every `notebook_search`, append
+  and `notebook_verify` parses the whole session file, so cost grows with the
+  journal. At 100 000 records `notebook_verify` takes ~1.3 s and ~1 GB of RSS
+  (measured in the 0.8.1 audit). An index is the 0.9 work item; until then a
+  session that large is a session worth splitting.
 - The figure library encodes one journal's geometry contract. It is a good
   contract, not a universal one; `figure_check` reports what it measured, so a
   different contract fails loudly instead of silently.

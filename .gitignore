@@ -6,3 +6,13 @@ backup/
 .audit/
 .adopt/
 node_modules/
+
+# local agent state of the projects this bundle records (never committed)
+.dsh/
+
+# python bytecode of the figure helpers
+__pycache__/
+*.pyc
+
+# scratch directories of the build itself
+.tmp/
