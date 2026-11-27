@@ -1,3 +1,17 @@
+## 0.8.4 — the published package carries every module it imports
+
+`services.js` was missing from `package.json` `files`, so a package installed
+from the repository (rather than from a clone) failed at import with
+`Cannot find module …/services.js`: `notebook`, `guard`, `provenance`,
+`scaffold`, `stack` and `telemetry` all import it. Installing from a workspace
+symlink hid this — the symlink has every file, the tarball does not.
+
+- `services.js` added to `files`; `npm pack --dry-run` now contains all sixteen
+  runtime modules (`51` files, `services.js` included).
+- `M18` in `smoke-regress.mjs`: every module a root module imports through
+  `./x.js` must be covered by `package.json` `files`; the suite is 49 → 50
+  checks. It fails on the 0.8.3 manifest.
+
 ## 0.8.3 — the guard reads where a command actually writes
 
 Two misses found by probing the real classifier rather than reading it:

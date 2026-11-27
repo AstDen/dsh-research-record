@@ -15,7 +15,8 @@
 
 import { mkdir, mkdtemp, readdir, readFile, stat, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { makeCtx, toolBox } from './fixtures/ctx.mjs'
 import * as guard from './guard.js'
@@ -657,6 +658,21 @@ async function sha256(text) {
     rows.length >= 2 && rows[0].id === newer.id && rows[1].id === older.id,
     `first=${rows[0]?.id} newest=${newer.id} count=${rows.length}`,
   )
+}
+
+// ── M18: every module the package imports is shipped in it ───────────────
+{
+  const root = dirname(fileURLToPath(import.meta.url))
+  const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+  const listed = (path) => manifest.files.some((entry) => path === entry || path.startsWith(`${entry}/`))
+  const missing = []
+  for (const name of (await readdir(root)).filter((entry) => entry.endsWith('.js'))) {
+    const text = await readFile(join(root, name), 'utf8')
+    for (const match of text.matchAll(/from '\.\/([^']+)'/g)) {
+      if (!listed(match[1])) missing.push(`${name} -> ${match[1]}`)
+    }
+  }
+  check('M18', 'every module the package imports is listed in package.json files', missing.length === 0, missing.join(' | '))
 }
 
 const failed = checks.filter((entry) => entry.ok !== true)

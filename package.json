@@ -1,6 +1,6 @@
 {
   "name": "dsh-research-record",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Hash-chained research notebook, file provenance graph, protected-path guard, research scaffold, journal figure tools, a privacy-preserving usage report and universal project adoption for DeepSeek Harness",
   "type": "module",
   "main": "index.js",
@@ -23,6 +23,7 @@
     "notebook.js",
     "provenance.js",
     "guard.js",
+    "services.js",
     "lock.js",
     "scaffold.js",
     "stack.js",
