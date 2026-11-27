@@ -23,10 +23,11 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { createReadStream, existsSync } from 'node:fs'
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
+import { createReadStream, existsSync, statSync } from 'node:fs'
+import { appendFile, copyFile, mkdir, open, readdir, readFile, stat, truncate } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
-import { appendLine } from './lock.js'
+import { appendLine, withAppendLock } from './lock.js'
+import { getService } from './services.js'
 
 export const name = 'research-record-notebook'
 export const inject = ['tools', 'systemPrompt']
@@ -41,6 +42,8 @@ const OUTCOME_TYPES = new Set(['observation', 'hypothesis'])
 const STATE_SET = new Set(['planned', 'attempted', 'completed', 'unverified'])
 const RELATION_SET = new Set(['supports', 'challenges', 'inconclusive', 'context'])
 const CONFIDENCE_SET = new Set(['low', 'medium', 'high'])
+/** A record is a research note, not a file dump: 512 KiB is already generous. */
+const MAX_INPUT_BYTES = 512 * 1024
 
 /** Crockford base32 — ULID, monotone enough for a journal. */
 const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
@@ -124,7 +127,7 @@ export async function resolveWorkspace(ctx, exec, config) {
 
   // 1. The harness owns the answer.
   try {
-    const service = ctx.workingDirectory ?? (typeof ctx.get === 'function' ? ctx.get('workingDirectory') : undefined)
+    const service = getService(ctx, 'workingDirectory')
     if (exec?.agent !== undefined && typeof service?.ensure === 'function') {
       const resolved = await service.ensure(exec.agent, exec.signal)
       if (typeof resolved === 'string' && resolved.length > 0) {
@@ -139,7 +142,7 @@ export async function resolveWorkspace(ctx, exec, config) {
   // 2. The session header keeps the original project directory.
   if (cwd === undefined) {
     try {
-      const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+      const store = getService(ctx, 'sessions')
       const session = agentId === undefined ? undefined : store?.get?.(agentId)
       const headerCwd = session?.header?.cwd
       if (typeof headerCwd === 'string' && headerCwd.length > 0) {
@@ -185,6 +188,32 @@ export async function activeWorkspace(ctx, exec, config) {
 }
 
 /**
+ * The web panel is a reader for one project, not for the whole disk: the
+ * requested directory must be the workspace of a live session of this host (or
+ * the host's own directory). `?workspace=/etc` is refused instead of listed.
+ */
+export async function panelWorkspace(ctx, requested) {
+  const raw = typeof requested === 'string' && requested.length > 0 ? requested : process.cwd()
+  const target = isAbsolute(raw) ? resolve(raw) : resolve(process.cwd(), raw)
+  const known = new Set([resolve(process.cwd())])
+  try {
+    const store = getService(ctx, 'sessions')
+    for (const session of store?.list?.() ?? []) {
+      const cwd = session?.header?.cwd
+      if (typeof cwd === 'string' && cwd.length > 0) known.add(resolve(cwd))
+    }
+  } catch {
+    /* no session store: only the host directory is trusted */
+  }
+  if (known.has(target)) return { ok: true, workspace: target }
+  return {
+    ok: false,
+    workspace: target,
+    error: `workspace ${target} is not a session workspace of this host; refusing to read its journals`,
+  }
+}
+
+/**
  * The agent a prompt assembly belongs to.
  *
  * `assembleContextFor` (`dsh-agent/lib/types/dispatch.js:92`) puts the same agent
@@ -208,7 +237,7 @@ function scopeSubject(context) {
 export function sessionWorkspace(ctx, agentId) {
   if (agentId === undefined) return undefined
   try {
-    const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+    const store = getService(ctx, 'sessions')
     const cwd = store?.get?.(agentId)?.header?.cwd
     if (typeof cwd === 'string' && cwd.length > 0) return cwd
   } catch {
@@ -232,6 +261,76 @@ async function readLines(file) {
     lines.push(trimmed)
   }
   return lines
+}
+
+/**
+ * A journal whose last line is not terminated cannot accept another line: the
+ * next append would glue itself to the fragment and lose both records.
+ */
+class TornJournalError extends Error {
+  constructor(file, size) {
+    super(
+      `journal tail is truncated: ${file} ends at byte ${size} without a newline. ` +
+        'Run notebook_verify with repair:true to trim the fragment and keep the intact prefix.',
+    )
+    this.code = 'TORN_TAIL'
+    this.file = file
+    this.size = size
+  }
+}
+
+/** Does the file end on a line boundary? An empty or missing file always does. */
+async function journalTail(file) {
+  let info
+  try {
+    info = await stat(file)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { exists: false, size: 0, broken: false }
+    throw error
+  }
+  if (info.size === 0) return { exists: true, size: 0, broken: false }
+  const handle = await open(file, 'r')
+  try {
+    const last = Buffer.alloc(1)
+    await handle.read(last, 0, 1, info.size - 1)
+    return { exists: true, size: info.size, broken: last[0] !== 0x0a }
+  } finally {
+    await handle.close()
+  }
+}
+
+/**
+ * Append one record under the journal lock, reading the previous hash inside the
+ * same critical section. Reading `prevHash` outside the lock is what let two
+ * writers fork the chain.
+ *
+ * @param {string} file journal path
+ * @param {object} template record body without `prevHash`/`hash`
+ * @param {string[]} [warnings] collected warnings
+ * @returns {Promise<object>} the stored record
+ */
+async function appendRecordOnce(file, template, warnings = []) {
+  return withAppendLock(file, async () => {
+    const tail = await journalTail(file)
+    if (tail.broken) throw new TornJournalError(file, tail.size)
+    let prevHash = GENESIS
+    const existing = await readLines(file)
+    if (existing.length > 0) {
+      try {
+        const last = JSON.parse(existing[existing.length - 1])
+        if (typeof last?.hash === 'string') prevHash = last.hash
+      } catch {
+        warnings.push('previous line of this journal is unreadable; the chain continues from genesis')
+      }
+    }
+    const record = { ...template, prevHash }
+    record.hash = hashRecord(record)
+    // The lock is already held, so append with appendFile directly. Going through
+    // appendLine would re-acquire the same lock, wait out its retries and then fall
+    // back to writing unlocked (see lock.js) — which is what corrupted the chain.
+    await appendFile(file, `${JSON.stringify(record)}\n`, 'utf8')
+    return record
+  })
 }
 
 /** All journal entries of a workspace, in write order. */
@@ -323,6 +422,71 @@ async function verifyJournal(workspace, onlyFile) {
   return { ok: true, records: total, files: checked, supersedes, checkedAt: new Date().toISOString() }
 }
 
+/**
+ * Trim a damaged journal back to its last complete, chain-consistent line.
+ *
+ * A torn tail (a kill or ENOSPC in the middle of a write) cannot be "repaired" in
+ * the sense of recovering the lost record — the bytes were never written. What can
+ * be recovered is everything before it: the append-only contract says the intact
+ * prefix is still a valid chain. A copy is kept next to the journal first, so the
+ * operation is reversible by hand.
+ *
+ * @param {string} workspace project directory
+ * @param {string} [onlyFile] journal file name, e.g. `s1.jsonl`
+ * @returns {Promise<Array<{file: string, removedBytes: number, keptLines: number, backup: string}>>}
+ */
+async function repairJournal(workspace, onlyFile) {
+  const dir = join(workspace, NOTEBOOK_DIR)
+  let names
+  try {
+    names = await readdir(dir)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return []
+    throw error
+  }
+  const targets = names
+    .filter((name) => name.endsWith('.jsonl') && name !== SUPERSEDE_FILE)
+    .filter((name) => onlyFile === undefined || name === onlyFile)
+    .sort()
+
+  const repairs = []
+  for (const name of targets) {
+    const file = join(dir, name)
+    const raw = await readFile(file)
+    if (raw.length === 0) continue
+
+    let previous = GENESIS
+    let kept = 0
+    let lines = 0
+    let offset = 0
+    while (offset < raw.length) {
+      const newline = raw.indexOf(0x0a, offset)
+      if (newline === -1) break // a trailing fragment, not a line
+      const text = raw.subarray(offset, newline).toString('utf8').trim()
+      offset = newline + 1
+      if (text.length === 0) continue
+      let record
+      try {
+        record = JSON.parse(text)
+      } catch {
+        break
+      }
+      if (record?.prevHash !== previous) break
+      if (hashRecord(record) !== record?.hash) break
+      previous = record.hash
+      kept = offset
+      lines += 1
+    }
+
+    if (kept === raw.length) continue // nothing torn
+    const backup = `${file}.bak-${Date.now()}`
+    await copyFile(file, backup)
+    await truncate(file, kept)
+    repairs.push({ file: name, removedBytes: raw.length - kept, keptLines: lines, backup })
+  }
+  return repairs
+}
+
 /** Compare a stored record against the current filesystem. */
 async function recheckArtifacts(workspace, artifacts) {
   if (!Array.isArray(artifacts)) return []
@@ -359,11 +523,29 @@ function toStringArray(value, limit = 50) {
   return value.filter((item) => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim()).slice(0, limit)
 }
 
+const CJK_RANGE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/
+const TOKEN_PATTERN = /[a-z0-9а-яё_+-]+|[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]+/gi
+
+/**
+ * Search terms from free text.
+ *
+ * Latin and Cyrillic words are split on punctuation; a run of CJK characters is
+ * one term and also yields its single characters, because those languages are
+ * written without spaces — dropping the run (as 0.8.1 did) made a Chinese or
+ * Japanese title unsearchable.
+ */
 function tokenize(text) {
-  return String(text ?? '')
-    .toLowerCase()
-    .split(/[^a-z0-9а-яё_+-]+/i)
-    .filter((token) => token.length > 1)
+  const terms = []
+  for (const match of String(text ?? '').toLowerCase().matchAll(TOKEN_PATTERN)) {
+    const token = match[0]
+    if (CJK_RANGE.test(token)) {
+      terms.push(token)
+      if (token.length > 1) for (const char of token) terms.push(char)
+      continue
+    }
+    if (token.length > 1) terms.push(token)
+  }
+  return terms
 }
 
 const SEARCH_STOP = new Set(['and', 'the', 'for', 'with', 'from', 'that', 'this', 'из', 'для', 'что', 'как', 'или', 'при'])
@@ -429,6 +611,14 @@ export async function appendAutoNote(workspace, input) {
   for (const item of Array.isArray(input?.artifacts) ? input.artifacts : []) {
     const path = typeof item?.path === 'string' ? item.path.trim() : ''
     if (path.length === 0 || seen.has(path)) continue
+    // A report may name a thing that is not a file ("PROJECT.md (вопрос)" was the
+    // bug); recording it would add a permanently missing artifact to the journal.
+    const absolute = isAbsolute(path) ? path : join(workspace, path)
+    try {
+      if (!statSync(absolute).isFile()) continue
+    } catch {
+      continue
+    }
     const artifact = { path, status: 'unchanged' }
     if (typeof item?.sha256 === 'string' && item.sha256.length > 0) artifact.sha256 = item.sha256
     artifacts.push(artifact)
@@ -439,25 +629,13 @@ export async function appendAutoNote(workspace, input) {
   await mkdir(dir, { recursive: true })
   const file = join(dir, `${sessionId}.jsonl`)
 
-  const existing = await readLines(file)
-  let prevHash = GENESIS
-  if (existing.length > 0) {
-    try {
-      const last = JSON.parse(existing[existing.length - 1])
-      if (typeof last?.hash === 'string') prevHash = last.hash
-    } catch {
-      /* the chain continues from genesis; notebook_verify will flag the tear */
-    }
-  }
-
   const toolName = typeof input?.toolName === 'string' ? input.toolName : 'tool'
   const count = artifacts.length
-  const record = {
+  const template = {
     schemaVersion: SCHEMA_VERSION,
     id: `n_${ulid()}`,
     sessionId,
     turnId: null,
-    prevHash,
     type: 'note',
     title: `${toolName} produced ${count} file${count === 1 ? '' : 's'}`,
     body: [
@@ -481,8 +659,14 @@ export async function appendAutoNote(workspace, input) {
     auto: true,
     stepId: typeof input?.stepId === 'string' ? input.stepId : null,
   }
-  record.hash = hashRecord(record)
-  await appendLine(file, `${JSON.stringify(record)}\n`)
+  let record
+  try {
+    record = await appendRecordOnce(file, template, [])
+  } catch (error) {
+    // An automatic note must never break the tool that produced the files.
+    if (error?.code === 'TORN_TAIL') return null
+    throw error
+  }
   for (const artifact of artifacts) seen.add(artifact.path)
   for (const refresh of digestRefreshers) {
     try {
@@ -682,22 +866,16 @@ export function apply(ctx, config) {
       }
       const title = typeof args?.title === 'string' ? args.title.trim() : ''
       if (title.length === 0) return { ok: false, error: 'title is required for every record' }
+      const approximateBytes = JSON.stringify(args ?? {}).length
+      if (approximateBytes > MAX_INPUT_BYTES) {
+        return { ok: false, error: `record input is too large: ~${approximateBytes} bytes, limit ${MAX_INPUT_BYTES}` }
+      }
+      if (exec?.signal?.aborted === true) return { ok: false, error: 'cancelled before the record was written' }
 
       const warnings = []
       const dir = join(workspace, NOTEBOOK_DIR)
       await mkdir(dir, { recursive: true })
       const file = join(dir, `${sessionId}.jsonl`)
-
-      const existing = await readLines(file)
-      let prevHash = GENESIS
-      if (existing.length > 0) {
-        try {
-          const last = JSON.parse(existing[existing.length - 1])
-          if (typeof last?.hash === 'string') prevHash = last.hash
-        } catch {
-          warnings.push('previous line of this journal is unreadable; the chain continues from genesis')
-        }
-      }
 
       let outcome = args?.outcome
       if (outcome !== undefined && outcome !== null) {
@@ -791,12 +969,11 @@ export function apply(ctx, config) {
       }
 
       const createdAt = new Date().toISOString()
-      const record = {
+      let record = {
         schemaVersion: SCHEMA_VERSION,
         id: `n_${ulid()}`,
         sessionId,
         turnId: typeof exec?.turnId === 'string' ? exec.turnId : null,
-        prevHash,
         type,
         title,
         body: typeof args?.body === 'string' ? args.body : '',
@@ -816,13 +993,24 @@ export function apply(ctx, config) {
         relatesTo,
         createdAt,
       }
-      record.hash = hashRecord(record)
-      await appendLine(file, `${JSON.stringify(record)}\n`)
+      try {
+        record = await appendRecordOnce(file, record, warnings)
+      } catch (error) {
+        if (error?.code === 'TORN_TAIL') {
+          return { ok: false, error: error.message, hint: 'call notebook_verify with repair:true to trim the torn tail', journal: file }
+        }
+        throw error
+      }
       if (supersedes !== null) {
-        await appendLine(
-          join(dir, SUPERSEDE_FILE),
-          `${JSON.stringify({ schemaVersion: SCHEMA_VERSION, targetId: supersedes, byId: record.id, at: createdAt, sessionId })}\n`,
-        )
+        try {
+          await appendLine(
+            join(dir, SUPERSEDE_FILE),
+            `${JSON.stringify({ schemaVersion: SCHEMA_VERSION, targetId: supersedes, byId: record.id, at: createdAt, sessionId })}\n`,
+          )
+        } catch (error) {
+          // The record itself is already durable; a failed link must not reject it.
+          warnings.push(`supersede link was not written: ${error instanceof Error ? error.message : String(error)}`)
+        }
       }
       scheduleDigest(workspace)
       return { ok: true, record, warnings, digest: record.hash, journal: file, workspace, workspaceSource: source }
@@ -890,10 +1078,19 @@ export function apply(ctx, config) {
         const hit = usable.find((entry) => entry.record.id === id)
         if (hit === undefined) return { ok: false, error: `no record with id ${id} in this project` }
         const warnings = []
-        if (typeof args?.expectedDigest === 'string' && args.expectedDigest.length > 0 && args.expectedDigest !== hit.record.hash) {
+        // Recompute: `hash` is a field of the record, so trusting the stored value
+        // would report a forged record as valid.
+        const recomputed = hashRecord(hit.record)
+        if (recomputed !== hit.record.hash) {
           return {
             ok: false,
-            error: `digest mismatch for ${id}: stored ${hit.record.hash}, expected ${args.expectedDigest} — the record was tampered with or belongs to another chain`,
+            error: `digest mismatch for ${id}: stored ${hit.record.hash}, recomputed ${recomputed} — the record was tampered with or belongs to another chain`,
+          }
+        }
+        if (typeof args?.expectedDigest === 'string' && args.expectedDigest.length > 0 && args.expectedDigest !== recomputed) {
+          return {
+            ok: false,
+            error: `digest mismatch for ${id}: stored ${recomputed}, expected ${args.expectedDigest} — the record was tampered with or belongs to another chain`,
           }
         }
         const record = { ...hit.record }
@@ -908,7 +1105,10 @@ export function apply(ctx, config) {
       }
 
       const scope = args?.scope === 'project' ? 'project' : 'session'
-      const limit = Number.isFinite(args?.limit) ? Math.max(1, Math.min(100, Math.trunc(args.limit))) : 10
+      // Models pass "5" as often as 5: a numeric string must mean five, not the
+      // default ten.
+      const rawLimit = typeof args?.limit === 'string' ? Number(args.limit) : args?.limit
+      const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, Math.trunc(rawLimit))) : 10
       const terms = tokenize(args?.query).filter((term) => !SEARCH_STOP.has(term)).slice(0, 12)
       const candidates = usable.filter((entry) => {
         if (scope === 'session' && entry.record.sessionId !== sessionId) return false
@@ -928,7 +1128,12 @@ export function apply(ctx, config) {
       }
       scored.sort((left, right) => {
         if (right.score !== left.score) return right.score - left.score
-        return String(left.record.createdAt).localeCompare(String(right.record.createdAt))
+        // Equal score: the newer record answers "what do I think now" better.
+        const byTime = String(right.record.createdAt).localeCompare(String(left.record.createdAt))
+        if (byTime !== 0) return byTime
+        // Two records can share a millisecond; a ULID is time-ordered, so the
+        // identifier settles it instead of leaving the order to the file.
+        return String(right.record.id).localeCompare(String(left.record.id))
       })
       const results = scored.slice(0, limit).map(({ record, score }) => ({
         id: record.id,
@@ -946,11 +1151,15 @@ export function apply(ctx, config) {
   ctx.tools.register({
     name: 'notebook_verify',
     description:
-      'Recompute the whole notebook hash chain (prevHash/hash per line, genesis at the file start) and report the first broken line. Use it before trusting a journal or after someone edited it by hand.',
+      'Recompute the whole notebook hash chain (prevHash/hash per line, genesis at the file start) and report the first broken line. ' +
+      'repair=true trims a torn tail (a kill or a full disk during a write) back to the last complete line and keeps a .bak copy; ' +
+      'it cannot restore the lost record, and it refuses a chain that is broken in the middle. ' +
+      'Use it before trusting a journal or after someone edited it by hand.',
     parameters: {
       type: 'object',
       properties: {
         session: { type: 'string', description: 'Check one session journal only (default: every journal in the workspace).' },
+        repair: { type: 'boolean', description: 'Trim a torn tail to the last intact line (default false).' },
       },
     },
     output: {
@@ -959,6 +1168,9 @@ export function apply(ctx, config) {
         if (value.ok === true) {
           const lines = [`notebook_verify: OK — ${value.records} record(s) in ${value.files.length} journal(s), ${value.supersedes} supersede link(s)`]
           for (const file of value.files) lines.push(`  ok ${file}`)
+          for (const repair of Array.isArray(value.repaired) ? value.repaired : []) {
+            lines.push(`  repaired ${repair.file}: removed ${repair.removedBytes} byte(s) after the last intact line, kept ${repair.keptLines} record(s), backup ${repair.backup}`)
+          }
           return [{ type: 'text', text: lines.join('\n') }]
         }
         const lines = [`notebook_verify: FAILED at ${value.brokenAt?.file}:${value.brokenAt?.line} (${value.brokenAt?.id ?? 'unknown'})`, `reason: ${value.brokenAt?.reason}`]
@@ -968,6 +1180,12 @@ export function apply(ctx, config) {
     async execute(args, exec) {
       const { cwd: workspace } = await workspaceFor(exec)
       const only = typeof args?.session === 'string' ? `${safeSessionId(args.session)}.jsonl` : undefined
+      if (args?.repair === true) {
+        const repaired = await repairJournal(workspace, only)
+        const verdict = await verifyJournal(workspace, only)
+        if (verdict.ok === true) scheduleDigest(workspace)
+        return { ...verdict, repaired }
+      }
       const result = await verifyJournal(workspace, only)
       if (result.ok === true) scheduleDigest(workspace)
       return result
@@ -991,7 +1209,12 @@ export function apply(ctx, config) {
           }
           try {
             const url = new URL(req.url ?? '/notebook', 'http://localhost')
-            const workspace = url.searchParams.get('workspace') ?? process.cwd()
+            const resolved = await panelWorkspace(ctx, url.searchParams.get('workspace'))
+            if (resolved.ok !== true) {
+              send(403, { ok: false, error: resolved.error })
+              return
+            }
+            const workspace = resolved.workspace
             const session = url.searchParams.get('session')
             const only = session !== null && session.length > 0 ? `${safeSessionId(session)}.jsonl` : undefined
             if (url.searchParams.get('verify') === '1') {

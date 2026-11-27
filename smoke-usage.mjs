@@ -20,6 +20,7 @@ import {
   summarizeEvents,
   apply,
 } from './telemetry.js'
+import { makeCtx } from './fixtures/ctx.mjs'
 
 let pass = 0
 let fail = 0
@@ -123,19 +124,19 @@ check('report never prints a workspace path', !text.includes(workspace))
 const tools = new Map()
 const commands = new Map()
 const hooks = new Map()
-const fakeCtx = {
-  workingDirectory: { ensure: async () => workspace },
-  sessions: { get: () => ({ header: { cwd: workspace } }) },
-  tools: { register: (definition) => tools.set(definition.name, definition) },
-  commands: { register: (definition) => commands.set(definition.name, definition) },
-  on: (event, listener) => {
-    const list = hooks.get(event) ?? []
-    list.push(listener)
-    hooks.set(event, list)
+let fakeCtx = makeCtx(
+  {
+    workingDirectory: { ensure: async () => workspace },
+    sessions: { get: () => ({ header: { cwd: workspace } }) },
+    tools: { register: (definition) => tools.set(definition.name, definition) },
+    commands: { register: (definition) => commands.set(definition.name, definition) },
   },
-}
+  { inject: ['tools', 'commands'], label: 'smoke-usage' },
+)
+for (const [event, listeners] of fakeCtx.__handlers) hooks.set(event, listeners)
 
 apply(fakeCtx, { maxFileBytes: 1_000_000 })
+for (const [event, listeners] of fakeCtx.__handlers) hooks.set(event, listeners)
 check('plugin registers the usage tool', tools.has('usage_report'))
 check('plugin registers the command', commands.has('usage-report'))
 check('plugin subscribes to tool results', (hooks.get('tools/result') ?? []).length === 1)

@@ -30,6 +30,7 @@
 
 import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { getService } from './services.js'
 
 export const name = 'research-record-guard'
 export const inject = ['tools']
@@ -37,7 +38,13 @@ export const inject = ['tools']
 /** Defaults used when `.dsh/policy.json` is absent or silent. */
 // Defaults match the brief: input directories are protected, destructive shell
 // commands confirm. A policy.json in the workspace replaces the globs wholesale.
-const DEFAULT_POLICY = { protectedPaths: ['user_data/**', 'data/**'], destructiveConfirm: true }
+const DEFAULT_POLICY = {
+  protectedPaths: ['user_data/**', 'data/**'],
+  // The one thing the protection must not stop: deriving. The scaffold's own
+  // AGENTS.md tells the model to work on copies in data/derived/.
+  allowPaths: ['derived/**', 'data/derived/**', '**/derived/**'],
+  destructiveConfirm: true,
+}
 
 /** A destructive shell fragment worth a confirmation, per the brief. */
 const DESTRUCTIVE = [
@@ -50,8 +57,19 @@ const DESTRUCTIVE = [
   { id: 'shred', re: /(^|[\s;&|(])shred\s/ },
 ]
 
-/** Command names that write to their path arguments. */
-const MUTATORS = /\b(rm|rmdir|mv|cp|mkdir|touch|truncate|chmod|chown|ln|tee|sed|perl|python3?|node|dd|shred|install|rsync|unzip|tar)\b/
+/**
+ * Command names that write to every path argument they are given — a bare token
+ * such as `user_data` is a destination for these, so flags are the only thing we
+ * may skip. `rm -r -f user_data` must be refused, not classified.
+ */
+const WRITERS = /\b(rm|rmdir|mv|cp|mkdir|touch|truncate|chmod|chown|ln|tee|dd|shred|install|rsync|unzip|tar|cpio|patch)\b/
+
+/**
+ * Interpreters and in-place editors that READ their path arguments unless asked
+ * to rewrite them. `sed -n 1p data/raw.csv` is a read; `sed -i …` is not.
+ */
+const IN_PLACE_TOOLS = /\b(sed|perl|ruby|python3?|node|php|awk)\b/
+const IN_PLACE_FLAG = /(^|[\s;&|(])(-i|--in-place)([\s.=;|&)]|$)/
 
 /** Extensions that make an otherwise bare token a plausible path. */
 const PATHISH_EXT = /\.(csv|tsv|json|jsonl|md|txt|log|py|js|mjs|cjs|ts|sh|yaml|yml|toml|npy|npz|h5|hdf5|stl|vtk|dat|parquet|png|pdf|xlsx|zip|gz|tgz)$/i
@@ -75,7 +93,7 @@ async function workspaceOf(ctx, exec) {
   //    restores the original project if it disappeared. This is the same path
   //    the built-in fs/bash tools take.
   try {
-    const service = ctx.workingDirectory ?? (typeof ctx.get === 'function' ? ctx.get('workingDirectory') : undefined)
+    const service = getService(ctx, 'workingDirectory')
     if (exec?.agent !== undefined && typeof service?.ensure === 'function') {
       const cwd = await service.ensure(exec.agent, exec.signal)
       if (typeof cwd === 'string' && cwd.length > 0) return cwd
@@ -85,7 +103,7 @@ async function workspaceOf(ctx, exec) {
   }
   // 2. The session header keeps the original project directory.
   try {
-    const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+    const store = getService(ctx, 'sessions')
     const session = agentId === undefined ? undefined : store?.get?.(agentId)
     const cwd = session?.header?.cwd
     if (typeof cwd === 'string' && cwd.length > 0) return cwd
@@ -98,6 +116,7 @@ async function workspaceOf(ctx, exec) {
 async function loadPolicy(workspace, config) {
   const policy = {
     protectedPaths: Array.isArray(config?.protectedPaths) ? [...config.protectedPaths] : [...DEFAULT_POLICY.protectedPaths],
+    allowPaths: Array.isArray(config?.allowPaths) ? [...config.allowPaths] : [...DEFAULT_POLICY.allowPaths],
     destructiveConfirm: config?.destructiveConfirm === undefined ? DEFAULT_POLICY.destructiveConfirm : config.destructiveConfirm !== false,
     path: join(workspace, '.dsh', 'policy.json'),
     found: false,
@@ -108,11 +127,13 @@ async function loadPolicy(workspace, config) {
     const parsed = JSON.parse(text)
     policy.found = true
     if (Array.isArray(parsed?.protectedPaths)) policy.protectedPaths = parsed.protectedPaths.map(String).filter((entry) => entry.length > 0)
+    if (Array.isArray(parsed?.allowPaths)) policy.allowPaths = parsed.allowPaths.map(String).filter((entry) => entry.length > 0)
     if (typeof parsed?.destructiveConfirm === 'boolean') policy.destructiveConfirm = parsed.destructiveConfirm
   } catch (error) {
     if (error?.code !== 'ENOENT') policy.error = String(error?.message ?? error)
   }
   policy.patterns = policy.protectedPaths.map((pattern) => ({ pattern, re: globToRegExp(pattern) }))
+  policy.allowed = policy.allowPaths.map((pattern) => ({ pattern, re: globToRegExp(pattern) }))
   return policy
 }
 
@@ -163,19 +184,30 @@ export function bashCandidates(command) {
     const cleaned = String(value).replace(/^["'`]|["'`]$/g, '')
     if (cleaned.length > 0 && !/^\/dev\//.test(cleaned)) found.add(cleaned)
   }
+  // A redirect always writes, whatever the command is.
   for (const match of command.matchAll(/>>?\s*("[^"]*"|'[^']*'|[^\s;&|]+)/g)) add(match[1])
-  if (MUTATORS.test(command)) {
-    for (const token of tokens(command)) if (looksLikePath(token)) add(token)
+  const writers = WRITERS.test(command)
+  const inPlace = IN_PLACE_TOOLS.test(command) && IN_PLACE_FLAG.test(command)
+  if (writers || inPlace) {
+    for (const token of tokens(command)) {
+      // For a writer every non-flag argument is a destination, including a bare
+      // name like `user_data`. For an in-place editor the same holds.
+      if (token.startsWith('-')) continue
+      if (/^[0-9]+$/.test(token)) continue
+      if (looksLikePath(token) || writers) add(token)
+    }
   }
   return [...found]
 }
 
 /** Which policy glob, if any, protects this candidate. */
-function matchProtected(candidate, workspace, patterns) {
+function matchProtected(candidate, workspace, patterns, allowed = []) {
   const absolute = isAbsolute(candidate) ? resolve(candidate) : resolve(workspace, candidate)
   const rel = relative(workspace, absolute).replace(/\\/g, '/')
   const inside = !rel.startsWith('..') && !isAbsolute(rel)
   const subject = inside ? rel : absolute.replace(/\\/g, '/')
+  const exemptions = allowed.filter((entry) => entry.re.test(subject) || entry.re.test(rel))
+  if (exemptions.length > 0) return undefined
   for (const { pattern, re } of patterns) {
     if (re.test(subject) || re.test(rel.startsWith('..') ? '' : rel)) return { pattern, rel: subject }
   }
@@ -237,7 +269,7 @@ export function apply(ctx, config) {
 
     if (toolName === 'write' || toolName === 'edit') {
       for (const candidate of pathArgs(args)) {
-        const hit = matchProtected(candidate, workspace, policy.patterns)
+        const hit = matchProtected(candidate, workspace, policy.patterns, policy.allowed)
         if (hit === undefined) continue
         bump(deniedBySession, sessionId)
         const reason = `guard: "${hit.rel}" is protected by "${hit.pattern}" (.dsh/policy.json). ${DENY_HINT}`
@@ -261,7 +293,7 @@ export function apply(ctx, config) {
       if (command.length === 0) return prior
 
       for (const candidate of bashCandidates(command)) {
-        const hit = matchProtected(candidate, workspace, policy.patterns)
+        const hit = matchProtected(candidate, workspace, policy.patterns, policy.allowed)
         if (hit === undefined) continue
         bump(deniedBySession, sessionId)
         const reason = `guard: this command writes to "${hit.rel}", protected by "${hit.pattern}" (.dsh/policy.json). ${DENY_HINT}`

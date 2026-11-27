@@ -14,6 +14,7 @@
 /** core = the work is crippled without it; optional = clear gain for a common task;
  *  situational = only for one task shape; avoid = known trap, do not install. */
 import { spawn } from 'node:child_process'
+import { getService } from './services.js'
 
 export const STACK = [
   {
@@ -92,6 +93,7 @@ export const STACK = [
     id: 'fluent',
     title: 'ANSYS Fluent',
     level: 'situational',
+    local: true,
     verified: '2026-11-27',
     why: 'Интервью по задаче → journal → запуск Fluent → разбор транскрипта → отчёт. В реестре DSH других Fluent-плагинов нет вообще.',
     packages: ['fluent-case-builder@0.6.0'],
@@ -239,9 +241,15 @@ export function renderRoutes() {
   return ROUTING.map((row) => '· ' + row[0] + ' → ' + row[1]).join('\n')
 }
 
+/** Quote a spec only when it needs it, so the printed command stays copy-pasteable. */
+export function shellQuote(spec) {
+  const text = String(spec)
+  return /^[A-Za-z0-9@._/~+=:,^-]+$/.test(text) ? text : `'${text.replace(/'/g, `'\\''`)}'`
+}
+
 /** Install command for a list of packages. */
 export function installCommand(packages, profile = 'web') {
-  return `dsh plugin --profile ${profile} add ${packages.join(' ')}`
+  return `dsh plugin --profile ${profile} add ${packages.map(shellQuote).join(' ')}`
 }
 
 const LEVEL_MARK = { core: '●', optional: '○', situational: '◌' }
@@ -256,9 +264,10 @@ function renderEntry(entry) {
 
 /** Render the stack as plain text for a chat command. */
 export function renderStack({ level } = {}) {
-  const items = STACK.filter((entry) => (level === undefined ? true : entry.level === level))
+  const everyLevel = level === undefined || level === 'all'
+  const items = STACK.filter((entry) => (everyLevel ? true : entry.level === level))
   const blocks = items.map(renderEntry)
-  if (level === undefined) {
+  if (everyLevel) {
     blocks.push(`✕ Не ставить\n${AVOID.map((item) => `   ${item.packages.join(', ')} — ${item.reason}`).join('\n')}`)
     blocks.push(`∅ Чего нет в экосистеме\n${GAPS.map((gap) => `   · ${gap}`).join('\n')}`)
   }
@@ -286,11 +295,18 @@ const PROMPT_TEXT =
   renderRoutes() +
   '\nПравило: если задача попадает в строку выше, идти этим тулом, а не bash-парсером или самодельным скриптом. Если нужного тула в наборе нет — сказать это и предложить /research-stack (установка), а не изобретать обход.'
 
-/** Packages of one level ('all' = every level). */
+/** Packages of one level ('all' = every level), registry specs only. */
 export function packagesForLevel(level) {
   const wanted = level === 'all' || level === undefined ? undefined : level
   return STACK.filter((entry) => wanted === undefined || entry.level === wanted)
+    .filter((entry) => entry.local !== true)
     .flatMap((entry) => entry.packages.map(packageName))
+}
+
+/** Entries installed from a local checkout: a name is not enough to install them. */
+export function localEntriesFor(level) {
+  const wanted = level === 'all' || level === undefined ? undefined : level
+  return STACK.filter((entry) => (wanted === undefined || entry.level === wanted) && entry.local === true)
 }
 
 export function levelOf(level) {
@@ -337,7 +353,7 @@ function runAdd(packages, profile, timeoutMs = 900000) {
 
 export function apply(ctx, config) {
   const defaultProfile = typeof config?.profile === 'string' ? config.profile : 'web'
-  const commands = ctx.commands ?? ctx.get('commands')
+  const commands = getService(ctx, 'commands')
   if (typeof commands?.register === 'function') {
     commands.register({
       name: 'research-stack',
@@ -388,7 +404,20 @@ export function apply(ctx, config) {
 
       const chosen = level ?? 'core'
       const packages = packagesForLevel(chosen)
-      if (packages.length === 0) return { ok: false, text: 'research_stack: для уровня "' + chosen + '" нет пакетов' }
+      const locals = localEntriesFor(chosen)
+      const manual = locals.map((entry) => `# ${entry.title}\n${entry.install}`).join('\n')
+      if (packages.length === 0) {
+        return locals.length === 0
+          ? { ok: false, text: 'research_stack: для уровня "' + chosen + '" нет пакетов' }
+          : {
+              ok: true,
+              local: locals.map((entry) => entry.id),
+              text:
+                'research_stack: этот уровень ставится локальным путём, из реестра его нет.\n' +
+                manual +
+                '\nУстановку выполняет человек: путь к каталогу знает только он.',
+            }
+      }
       const command = installCommand(packages, profile)
       if (args?.confirm !== true) {
         return {
@@ -405,7 +434,8 @@ export function apply(ctx, config) {
           ? '\n\nПрофиль лежит вне рабочей папки: процесс под sandbox не может в него писать. Выполните команду в терминале или переключите /permission danger-full-access и повторите.'
           : '\n\nКоманда завершилась с ошибкой — смотрите вывод выше.'
         : '\n\nГотово. Новые тулы появляются в наборе при загрузке профиля: обновите страницу и, если набор не изменился, перезапустите DSH.'
-      return { ok: !failed, code: result.code, text: command + '\n\n' + tail + note }
+      const manualNote = locals.length > 0 ? `\n\nЛокальные (не из реестра) — отдельно:\n${manual}` : ''
+      return { ok: !failed, code: result.code, text: command + '\n\n' + tail + note + manualNote, local: locals.map((entry) => entry.id) }
     },
   })
 }

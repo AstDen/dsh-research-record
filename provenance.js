@@ -33,8 +33,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { appendLine } from './lock.js'
-import { activeWorkspace, resolveWorkspace } from './notebook.js'
+import { activeWorkspace, panelWorkspace, resolveWorkspace } from './notebook.js'
 import { appendAutoNote } from './notebook.js'
+import { getService } from './services.js'
 
 export const name = 'research-record-provenance'
 export const inject = ['tools']
@@ -42,6 +43,9 @@ export const inject = ['tools']
 const SCHEMA_VERSION = 1
 const PROVENANCE_DIR = '.dsh/provenance'
 const MAX_EDGES = 200
+/** Millisecond of slack when an ISO stamp is compared with a filesystem mtime. */
+const CLOCK_SLACK_MS = 5
+
 const MAX_HASH_BYTES = 512 * 1024 * 1024
 const MAX_SCAN_FILES = 20000
 const SKIP_DIRS = new Set(['node_modules', '.git', '.dsh', 'dist', 'build', 'target', '.venv', 'venv', '__pycache__'])
@@ -94,14 +98,23 @@ function pathArgs(args, workspace) {
   return [...new Set(found)]
 }
 
+/** Keys whose value is file content, not an intent: the journal keeps the size only. */
+const REDACTED_ARG_KEYS = new Set(['content', 'old_string', 'new_string', 'newText', 'oldText'])
+
 /** Commands keep no absolute workspace path in the journal: relativize, trim. */
 function cleanArgs(args, workspace) {
   if (args === null || typeof args !== 'object') return {}
   const copy = {}
   for (const [key, value] of Object.entries(args)) {
+    if (REDACTED_ARG_KEYS.has(key)) {
+      // A steps.jsonl is copied into reports, shared and committed. File content
+      // is the one thing that must never end up there — only its size.
+      copy[key] = { redacted: true, chars: typeof value === 'string' ? value.length : null }
+      continue
+    }
     if (typeof value === 'string') {
       const relative = isAbsolute(value) ? relativize(value, workspace) : value
-      copy[key] = relative.length > 4096 ? `${relative.slice(0, 4096)}…` : relative
+      copy[key] = relative.length > 1024 ? `${relative.slice(0, 1024)}…` : relative
       continue
     }
     if (Array.isArray(value)) {
@@ -175,7 +188,7 @@ async function scanWorkspace(workspace) {
       }
       try {
         const info = await stat(absolute)
-        snapshot.set(relativize(absolute, workspace), { size: info.size, mtimeMs: info.mtimeMs, sha256: undefined })
+        snapshot.set(relativize(absolute, workspace), { size: info.size, mtimeMs: info.mtimeMs, ctimeMs: info.ctimeMs, sha256: undefined })
       } catch {
         /* a disappearing file is not an error */
       }
@@ -327,6 +340,14 @@ export function apply(ctx, config) {
   /** agentId -> ModelSelection captured at step admission (the only place it is known). */
   const stepModels = new Map()
   const pendingScan = new Set()
+  /**
+   * A bash step needs the state BEFORE the command runs. The first pass after a
+   * restart used to compare with a snapshot taken after the command, so a fresh
+   * host reported `outputs: []` for the first write. The call event is the only
+   * hook that fires before execution, so the scan starts there and the step
+   * awaits its promise.
+   */
+  const preScans = new Map()
   const degradedWorkspaces = new Set()
 
   /**
@@ -341,7 +362,7 @@ export function apply(ctx, config) {
     if (agentId === undefined) return { role: 'lead', model: configModel(config) }
     let header
     try {
-      const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+      const store = getService(ctx, 'sessions')
       header = store?.get?.(agentId)?.header
     } catch {
       header = undefined
@@ -410,6 +431,17 @@ export function apply(ctx, config) {
         const toolName = event?.data?.toolName ?? event?.toolName
         if (typeof callId !== 'string' || callId.length === 0) return
         callMeta.set(callId, { toolName: String(toolName ?? 'unknown'), at: event?.timestamp ?? new Date().toISOString() })
+        if (String(toolName ?? '') === 'bash') {
+          const owner = typeof session?.header?.id === 'string' ? session.header.id : undefined
+          void (async () => {
+            try {
+              const { cwd } = await resolveWorkspace(ctx, owner === undefined ? undefined : { agent: { id: owner } }, config)
+              if (!preScans.has(cwd)) preScans.set(cwd, scanWorkspace(cwd))
+            } catch {
+              /* the step falls back to the current snapshot */
+            }
+          })()
+        }
         if (callMeta.size > 5000) {
           const oldest = callMeta.keys().next().value
           callMeta.delete(oldest)
@@ -483,23 +515,43 @@ async function recordStep(exec, result) {
           const before = await edgeFor(workspace, rel, null)
           if (before.status !== 'missing') inputs.push({ path: before.path, sha256: known, size: before.size })
         }
-        const edge = await edgeFor(workspace, rel, null)
-        if (edge.status !== 'missing' && edge.status !== 'unreadable') {
-          outputs.push({ path: edge.path, sha256: edge.sha256, size: edge.size })
-          if (edge.sha256 !== 'unhashed' && typeof edge.sha256 === 'string') {
-            const entry = snapshot.get(edge.path) ?? { size: edge.size, mtimeMs: Date.now() }
-            entry.sha256 = edge.sha256
-            entry.size = edge.size
-            entry.mtimeMs = Date.now()
-            snapshot.set(edge.path, entry)
-          }
+        if (isError) {
+          // The write failed: hashing the file now would report the OLD content as
+          // this step's output, which is worse than recording no edge at all.
+          notes.push(`write failed; ${rel} was not recorded as an output`)
         } else {
-          notes.push(`output ${rel} ${edge.status}`)
+          const edge = await edgeFor(workspace, rel, null)
+          if (edge.status !== 'missing' && edge.status !== 'unreadable') {
+            outputs.push({ path: edge.path, sha256: edge.sha256, size: edge.size })
+            if (edge.sha256 !== 'unhashed' && typeof edge.sha256 === 'string') {
+              const entry = snapshot.get(edge.path) ?? { size: edge.size, mtimeMs: Date.now() }
+              entry.sha256 = edge.sha256
+              entry.size = edge.size
+              entry.mtimeMs = Date.now()
+              snapshot.set(edge.path, entry)
+            }
+          } else {
+            notes.push(`output ${rel} ${edge.status}`)
+          }
         }
       }
     } else if (toolName === 'bash') {
       const command = typeof args?.command === 'string' ? args.command : ''
-      const before = new Map(snapshot)
+      let before = new Map(snapshot)
+      const preScan = preScans.get(workspace)
+      if (preScan !== undefined) {
+        preScans.delete(workspace)
+        try {
+          const scanned = await preScan
+          before = new Map(scanned.snapshot)
+          if (scanned.degraded === true && fidelity === 'observed') {
+            fidelity = 'inferred'
+            notes.push('the pre-command scan was degraded: mtime-only detection')
+          }
+        } catch {
+          /* fall back to the snapshot we already have */
+        }
+      }
       for (const token of bashPathTokens(command)) await pushInput(token)
       if (pendingScan.has(workspace)) {
         fidelity = 'inferred'
@@ -513,9 +565,23 @@ async function recordStep(exec, result) {
             fidelity = 'inferred'
             notes.push(`workspace above ${MAX_SCAN_FILES} files: mtime-only detection`)
           }
+          const startedAtMs = Date.parse(startedAt)
           for (const [path, info] of after) {
             const previous = before.get(path)
-            if (previous !== undefined && previous.size === info.size && previous.mtimeMs === info.mtimeMs) continue
+            const unchanged =
+              previous !== undefined &&
+              previous.size === info.size &&
+              previous.mtimeMs === info.mtimeMs &&
+              (previous.ctimeMs === undefined || info.ctimeMs === undefined || previous.ctimeMs === info.ctimeMs)
+            // A file whose mtime is at or after the moment the call was announced
+            // was written by this call even when the pre-scan already saw it: the
+            // scan is asynchronous, so a fast command can finish inside its window
+            // and then `unchanged` would hide the only evidence we have. The slack
+            // absorbs the difference between an ISO millisecond stamp and the
+            // sub-millisecond mtime a filesystem actually stores.
+            const touchedDuringCall =
+              Number.isFinite(startedAtMs) && info.mtimeMs >= startedAtMs - CLOCK_SLACK_MS
+            if (unchanged && !touchedDuringCall) continue
             if (outputs.length + inputs.length >= MAX_EDGES) {
               fidelity = 'inferred'
               notes.push(`edge limit ${MAX_EDGES} reached; the rest of this step is truncated`)
@@ -671,7 +737,10 @@ async function recordStep(exec, result) {
       const problems = []
       const ids = new Set()
       const sessions = new Set()
-      let previousTimestamp = ''
+      // Timestamps are monotonic *within one session*: two sessions is not a
+      // paradox, and comparing them was a false positive that failed every
+      // parallel run.
+      const previousBySession = new Map()
       let steps = 0
       // A later step that re-recorded the same path explains the change; only
       // the newest recorded version is compared with the disk.
@@ -695,8 +764,11 @@ async function recordStep(exec, result) {
         else ids.add(step.id)
         if (typeof step.timestamp !== 'string') problems.push(`step ${step.id} has no timestamp`)
         else {
-          if (previousTimestamp !== '' && step.timestamp < previousTimestamp) problems.push(`step ${step.id} goes back in time (${step.timestamp} < ${previousTimestamp})`)
-          previousTimestamp = step.timestamp
+          const previousTimestamp = previousBySession.get(entry.session) ?? ''
+          if (previousTimestamp !== '' && step.timestamp < previousTimestamp) {
+            problems.push(`step ${step.id} goes back in time within session ${entry.session} (${step.timestamp} < ${previousTimestamp})`)
+          }
+          previousBySession.set(entry.session, step.timestamp)
         }
         if (args?.checkFiles === true) {
           for (const edge of step.outputs ?? []) {
@@ -731,7 +803,14 @@ async function recordStep(exec, result) {
           try {
             const url = new URL(req.url ?? '/provenance', 'http://localhost')
             const target = url.searchParams.get('path') ?? ''
-            const workspace = url.searchParams.get('workspace') ?? process.cwd()
+            const resolved = await panelWorkspace(ctx, url.searchParams.get('workspace'))
+            if (resolved.ok !== true) {
+              res.statusCode = 403
+              res.setHeader('content-type', 'application/json; charset=utf-8')
+              res.end(JSON.stringify({ ok: false, error: resolved.error }))
+              return
+            }
+            const workspace = resolved.workspace
             if (target.length === 0) {
               res.statusCode = 400
               res.setHeader('content-type', 'application/json; charset=utf-8')

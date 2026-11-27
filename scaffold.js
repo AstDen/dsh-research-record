@@ -16,9 +16,10 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { copyFile, mkdir, writeFile } from 'node:fs/promises'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { appendAutoNote, activeWorkspace, sessionWorkspace } from './notebook.js'
+import { getService } from './services.js'
 
 export const name = 'research-record-scaffold'
 export const inject = ['tools', 'systemPrompt']
@@ -352,6 +353,8 @@ export async function scaffoldResearchProject(workspace, options = {}) {
   const projectName = givenName.length > 0 ? givenName : typeof previous?.name === 'string' && previous.name.length > 0 ? previous.name : guessProjectName(root)
   const created = []
   const skipped = []
+  const updated = []
+  const backedUp = []
   const folders = []
 
   for (const [relative] of FOLDERS) {
@@ -384,6 +387,13 @@ export async function scaffoldResearchProject(workspace, options = {}) {
       continue
     }
     await mkdir(dirname(target), { recursive: true })
+    // force is destructive to hand edits, so the previous text is kept beside it
+    // (the same rule the journal repair follows: back up, then overwrite).
+    if (existsSync(target)) {
+      const backup = `${target}.bak-${Date.now()}`
+      await copyFile(target, backup)
+      backedUp.push(relative)
+    }
     await writeFile(target, content, 'utf8')
     created.push(relative)
   }
@@ -394,7 +404,10 @@ export async function scaffoldResearchProject(workspace, options = {}) {
     const line = `\n## Вопрос (из запроса)\n\n${options.brief.trim()}\n`
     if (!existing.includes(options.brief.trim())) {
       await writeFile(briefPath, `${existing.trimEnd()}\n${line}`, 'utf8')
-      created.push('PROJECT.md (вопрос)')
+      // The report lists real paths only: a label like "PROJECT.md (вопрос)" was
+      // turned into a journal artifact and hashed as missing.
+      if (existing.trim().length === 0) created.push('PROJECT.md')
+      else updated.push('PROJECT.md')
     }
   }
 
@@ -405,7 +418,7 @@ export async function scaffoldResearchProject(workspace, options = {}) {
     await mkdir(dirname(policyPath), { recursive: true })
     await writeFile(
       policyPath,
-      `${JSON.stringify({ protectedPaths: ['data/raw/**', 'data/**'], destructiveConfirm: true }, null, 2)}\n`,
+      `${JSON.stringify({ protectedPaths: ['data/raw/**', 'data/**'], allowPaths: ['data/derived/**', 'derived/**'], destructiveConfirm: true }, null, 2)}\n`,
       'utf8',
     )
     created.push(POLICY)
@@ -430,7 +443,7 @@ export async function scaffoldResearchProject(workspace, options = {}) {
   await writeFile(markerPath, `${JSON.stringify(marker, null, 2)}\n`, 'utf8')
   created.push(MARKER)
 
-  return { ok: true, workspace: root, project: projectName, created, skipped, folders, marker }
+  return { ok: true, workspace: root, project: projectName, created, skipped, updated, backedUp, folders, marker }
 }
 
 function guessProjectName(root) {
@@ -520,6 +533,8 @@ export function apply(ctx, config) {
         const lines = [`research project ready: ${value.project} (${value.workspace})`]
         lines.push(`folders: ${value.folders.length}`)
         if (value.created.length > 0) lines.push(`created: ${value.created.join(', ')}`)
+        if (value.updated.length > 0) lines.push(`updated: ${value.updated.join(', ')}`)
+        if (value.backedUp.length > 0) lines.push(`backed up before force: ${value.backedUp.join(', ')}`)
         if (value.skipped.length > 0) lines.push(`kept as-is: ${value.skipped.join(', ')}`)
         lines.push('next: fill PROJECT.md and hypotheses/registry.md, then work through runs/ and analysis/.')
         return [{ type: 'text', text: lines.join('\n') }]
@@ -529,6 +544,16 @@ export function apply(ctx, config) {
       const requested = typeof args?.path === 'string' && args.path.trim().length > 0 ? args.path.trim() : undefined
       const base = await workspaceOf(exec)
       const workspace = requested === undefined ? base : isAbsolute(requested) ? requested : resolve(base, requested)
+      // The same rule the survey and the panels follow: this plugin writes inside
+      // the project the session works in, never into an arbitrary directory that
+      // came in as a tool argument.
+      if (workspace !== base && !workspace.startsWith(`${base}${sep}`)) {
+        return {
+          ok: false,
+          error: `research_init builds a project inside the session workspace (${base}); ${workspace} is outside it`,
+          workspace,
+        }
+      }
       const report = await scaffoldResearchProject(workspace, { name: args?.name, brief: args?.brief, force: args?.force === true })
       try {
         await appendAutoNote(workspace, {
@@ -544,7 +569,7 @@ export function apply(ctx, config) {
     },
   })
 
-  const commands = ctx.commands ?? (typeof ctx.get === 'function' ? ctx.get('commands') : undefined)
+  const commands = getService(ctx, 'commands')
   if (typeof commands?.register === 'function') commands.register({
     name: 'research-init',
     description: 'Create the research project infrastructure in this directory (folders, forms, AGENTS.md, journal marker)',
@@ -566,6 +591,8 @@ export function apply(ctx, config) {
         }
         const parts = [`научный проект «${report.project}» готов: ${report.workspace}`]
         parts.push(`папок: ${report.folders.length}, создано файлов: ${report.created.filter((entry) => !entry.endsWith('/')).length}`)
+        if (report.updated.length > 0) parts.push(`дополнено: ${report.updated.join(', ')}`)
+        if (report.backedUp.length > 0) parts.push(`бэкап перед перезаписью: ${report.backedUp.join(', ')}`)
         if (report.skipped.length > 0) parts.push(`не тронуто: ${report.skipped.join(', ')}`)
         parts.push('дальше: заполнить PROJECT.md и hypotheses/registry.md, затем работать через runs/ и analysis/.')
         return { kind: 'success', text: parts.join('\n') }

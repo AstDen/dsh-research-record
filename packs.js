@@ -363,7 +363,12 @@ export function assignRoles(map, packs = []) {
     let packReason
     for (const pack of packs) {
       for (const signature of pack.dirs) {
-        const nameMatches = typeof signature.nameMatches === 'string' ? new RegExp(signature.nameMatches) : null
+        // A pack is project data, not code: a malformed pattern must disable one
+        // signature, never break both survey tools. An unparsable pattern is a
+        // broken signature (skip it), not a pattern-less one (match everything).
+        const hasPattern = typeof signature.nameMatches === 'string'
+        const nameMatches = hasPattern ? safeRegExp(signature.nameMatches) : null
+        if (hasPattern && nameMatches === null) continue
         const base = node.path === '.' ? '' : node.path.slice(node.path.lastIndexOf('/') + 1)
         if (nameMatches !== null && !nameMatches.test(base)) continue
         if (Array.isArray(signature.parentHas)) {

@@ -44,8 +44,33 @@ def _fonts(path):
     return sorted(names)
 
 
+def _pdf_font_facts(path):
+    """Names, embedding and Type 3 presence, read from the PDF bytes alone.
+
+    ``/BaseFont`` names a font; only ``/FontFile``, ``/FontFile2`` or
+    ``/FontFile3`` mean its program is actually inside the file. A PDF can name
+    a font it never embedded, and that is exactly what a journal rejects.
+    """
+    with open(path, "rb") as fh:
+        data = fh.read()
+    names = set()
+    for raw in re.findall(rb"/BaseFont\s*/([#\w+\-.]+)", data):
+        name = raw.decode("latin-1")
+        if "+" in name:                      # subset prefix, e.g. ABCDEF+LinLibertineO
+            name = name.split("+", 1)[1]
+        names.add(name)
+    embedded = any(marker in data for marker in (b"/FontFile", b"/FontFile2", b"/FontFile3"))
+    type3 = re.search(rb"/Subtype\s*/Type3\b", data) is not None
+    return sorted(names), embedded, type3
+
+
 def _font_types(path):
-    """Font types reported by pdffonts when it is installed."""
+    """Font types reported by pdffonts, keyed by PostScript name.
+
+    pdffonts separates its columns with runs of spaces, and a font name may
+    itself contain a space ("Type 3" split from "ABCDEF+Name" by a plain
+    ``str.split()`` is how the 0.8.1 check stopped seeing Type 3 at all).
+    """
     import shutil
     import subprocess
 
@@ -55,10 +80,10 @@ def _font_types(path):
                          check=False).stdout.splitlines()
     types = {}
     for line in out[2:]:
-        parts = line.split()
+        parts = re.split(r"\s{2,}", line.strip())
         if len(parts) >= 3:
             name = parts[0].split("+", 1)[-1]
-            types[name] = parts[1]
+            types[name] = parts[1].strip()
     return types
 
 
@@ -67,7 +92,7 @@ def check_pdf(path, expect_width_mm=None, expect_height_mm=None,
     """Return a report dict: ``ok``, measured size, fonts, and warnings."""
     expect_font = expect_font or FONT_FAMILY
     width_mm, height_mm = pdf_page_size_mm(path)
-    fonts = _fonts(path)
+    fonts, embedded, type3_in_pdf = _pdf_font_facts(path)
     types = _font_types(path)
     warnings = []
 
@@ -100,7 +125,10 @@ def check_pdf(path, expect_width_mm=None, expect_height_mm=None,
             f"no {expect_font!r} in embedded fonts ({', '.join(fonts[:4])}) — "
             f"the font is probably not installed, so matplotlib fell back")
 
-    type3 = sorted(n for n, t in types.items() if t == "Type 3")
+    type3 = sorted(n for n, t in types.items() if t.strip() == "Type 3")
+    if not type3 and type3_in_pdf:
+        # pdffonts is optional; the PDF itself already said Type 3.
+        type3 = sorted(fonts) or ["(unnamed)"]
     if type3:
         warnings.append(
             "Type 3 fonts (" + ", ".join(type3[:3]) + ") — set pdf.fonttype=42 "
@@ -108,6 +136,10 @@ def check_pdf(path, expect_width_mm=None, expect_height_mm=None,
 
     if not fonts:
         warnings.append("no embedded fonts found — text may not be selectable")
+    elif not embedded:
+        warnings.append(
+            "the PDF names fonts but embeds none (/FontFile* absent) — the "
+            "viewer substitutes a different font")
 
     return {
         "file": str(path),
@@ -115,6 +147,7 @@ def check_pdf(path, expect_width_mm=None, expect_height_mm=None,
         "page_size_mm": [round(width_mm, 2), round(height_mm, 2)],
         "width_ok": any(abs(width_mm - w) <= width_tol_mm for w in JOURNAL_WIDTHS_MM),
         "fonts": fonts,
+        "fonts_embedded": embedded,
         "font_types": types,
         "expected_font": expect_font,
         "warnings": warnings,

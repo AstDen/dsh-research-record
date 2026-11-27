@@ -14,6 +14,7 @@ import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { makeCtx } from './fixtures/ctx.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const scaffold = await import(join(resolve(here), 'scaffold.js'))
@@ -76,15 +77,16 @@ const handlers = new Map()
 const tools = new Map()
 const sections = []
 const notes = []
-const ctx = {
-  sessions: { get: (id) => (id === 'agent-1' ? { header: { id, cwd: workspace } } : undefined) },
-  get: (name) => (name === 'sessions' ? ctx.sessions : name === 'commands' ? ctx.commands : undefined),
-  tools: { register(definition) { tools.set(definition.name, definition); return () => undefined } },
-  commands: { register(definition) { handlers.set(definition.name, definition); return () => undefined } },
-  systemPrompt: { section(section) { sections.push(section); return () => undefined } },
-  workingDirectory: { ensure: async () => workspace },
-  on() { return () => undefined },
-}
+const ctx = makeCtx(
+  {
+    sessions: { get: (id) => (id === 'agent-1' ? { header: { id, cwd: workspace } } : undefined) },
+    tools: { register(definition) { tools.set(definition.name, definition); return () => undefined } },
+    commands: { register(definition) { handlers.set(definition.name, definition); return () => undefined } },
+    systemPrompt: { section(section) { sections.push(section); return () => undefined } },
+    workingDirectory: { ensure: async () => workspace },
+  },
+  { inject: scaffold.inject, label: 'smoke-scaffold' },
+)
 scaffold.apply(ctx, {})
 
 check('tool research_init is registered', tools.has('research_init'))

@@ -22,6 +22,7 @@ import { basename, extname, isAbsolute, join, relative } from 'node:path'
 import { appendLine } from './lock.js'
 import { activeWorkspace } from './notebook.js'
 import { ROUTING } from './stack.js'
+import { getService } from './services.js'
 
 export const name = 'research-record-usage'
 export const inject = ['tools', 'commands']
@@ -56,7 +57,11 @@ export function sanitizeError(value, workspace) {
   if (typeof workspace === 'string' && workspace.length > 0) {
     text = text.split(workspace).join('<workspace>')
   }
-  text = text.replace(/\/home\/[^/\s]+/g, '~').replace(/[A-Za-z]:\\\\Users\\\\[^\\\s]+/g, '~')
+  text = text
+    .replace(/\/home\/[^/\s]+/g, '~')
+    .replace(/\/Users\/[^/\s]+/g, '~')
+    .replace(/[A-Za-z]:\\Users\\[^\\\s]+/g, '~')
+    .replace(/[A-Za-z]:\\Documents and Settings\\[^\\\s]+/g, '~')
   text = text.replace(/\s+/g, ' ').trim()
   return text.length > MAX_ERROR_CHARS ? `${text.slice(0, MAX_ERROR_CHARS - 1)}…` : text
 }
@@ -362,7 +367,7 @@ export function apply(ctx, config) {
     if (agentId === undefined) return { role: 'lead', model: modelFor(undefined) }
     let header
     try {
-      const store = ctx.sessions ?? (typeof ctx.get === 'function' ? ctx.get('sessions') : undefined)
+      const store = getService(ctx, 'sessions')
       header = store?.get?.(agentId)?.header
     } catch {
       header = undefined
@@ -532,7 +537,7 @@ export function apply(ctx, config) {
     },
   })
 
-  const commands = ctx.commands ?? (typeof ctx.get === 'function' ? ctx.get('commands') : undefined)
+  const commands = getService(ctx, 'commands')
   if (typeof commands?.register === 'function') {
     commands.register({
       name: 'usage-report',

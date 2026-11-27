@@ -18,7 +18,12 @@ def save_data_table(output_dir, txt_name, description, params, df, sort_by=None)
     (any object with ``columns``, ``iterrows()`` and ``len()``; pandas is used
     for sorting and NaN detection when available).
     """
-    import pandas as pd
+    # pandas is not a hard dependency of the bundle: ``df`` only has to look like
+    # a frame, and NaN detection is skipped when pandas is absent.
+    try:
+        import pandas as pd
+    except ImportError:                      # a plain list-of-rows frame
+        pd = None
 
     if sort_by is not None:
         df = df.sort_values(sort_by)
@@ -40,7 +45,9 @@ def save_data_table(output_dir, txt_name, description, params, df, sort_by=None)
             cells = []
             for col in cols:
                 value = row[col]
-                if pd.isna(value):
+                if pd is not None and pd.isna(value):
+                    text = "NaN"
+                elif value is None:
                     text = "NaN"
                 elif isinstance(value, float):
                     text = f"{value:.6g}"

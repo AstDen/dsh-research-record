@@ -85,6 +85,19 @@ function toPosix(value) {
  * minute, and the map must say plainly that it stopped early instead of
  * pretending the tree ends where the walk ended.
  */
+/**
+ * A marker is a file NAME inside the directory it marks, never a path: a name
+ * like `../OUTSIDE.md` would write into a sibling project, and `sub/notes.md`
+ * would land on top of the owner's notes.
+ */
+function markerFileName(name) {
+  const candidate = String(name ?? '').trim()
+  if (candidate.length === 0) return null
+  if (candidate === '.' || candidate === '..') return null
+  if (candidate.includes('/') || candidate.includes('\\')) return null
+  return candidate
+}
+
 export async function walkTree(root, { maxDepth = 6, maxFiles = 20000, maxDirs = 2000, markers = false, markerName = '.dsh-map.json', packs } = {}) {
   const absoluteRoot = resolve(root)
   const domainPacks = Array.isArray(packs) ? packs : loadPacks(absoluteRoot)
@@ -93,9 +106,18 @@ export async function walkTree(root, { maxDepth = 6, maxFiles = 20000, maxDirs =
   const skippedDirectories = []
   let filesSeen = 0
   let truncated = false
+  const requestedMarkers = markers === true
+  const markerNameSafe = markerFileName(markerName)
+  const markersEnabled = requestedMarkers && markerNameSafe !== null
+  const markerRejected = requestedMarkers && markerNameSafe === null ? `marker name "${String(markerName)}" is not a bare file name; markers were not written` : undefined
+  let markersSkipped = 0
   const queue = [{ path: absoluteRoot, depth: 0 }]
 
   while (queue.length > 0) {
+    if (filesSeen >= maxFiles) {
+      truncated = true
+      break
+    }
     const current = queue.shift()
     if (nodes.length >= maxDirs) {
       truncated = true
@@ -127,7 +149,11 @@ export async function walkTree(root, { maxDepth = 6, maxFiles = 20000, maxDirs =
       const entryPath = join(current.path, entry.name)
       if (entry.isDirectory()) {
         const lower = entry.name.toLowerCase()
-        if (SKIP_DIRS.has(lower) || SKIP_DIR_PREFIX.some((prefix) => lower.startsWith(prefix))) continue
+        // '.git' must skip git, not '.github'; a variant such as '.git-rewrite'
+        // is skipped by the '-'-suffixed form, never by a bare prefix.
+        const skipped =
+          SKIP_DIRS.has(lower) || SKIP_DIR_PREFIX.some((prefix) => lower === prefix || lower.startsWith(`${prefix}-`))
+        if (skipped) continue
         node.dirs += 1
         if (current.depth + 1 <= maxDepth) queue.push({ path: entryPath, depth: current.depth + 1 })
         else node.truncatedDepth = true
@@ -161,17 +187,18 @@ export async function walkTree(root, { maxDepth = 6, maxFiles = 20000, maxDirs =
     }
     node.signature = signatureOf(node)
     nodes.push(node)
-    if (markers) {
+    if (markersEnabled) {
       try {
-        await writeFile(join(current.path, markerName), JSON.stringify({
+        await writeFile(join(current.path, markerNameSafe), JSON.stringify({
           v: 1,
           path: node.path,
           files: node.files,
           kinds: node.kinds,
           latest: node.latest,
           generated: new Date().toISOString(),
-        }, null, 2) + '\n')
-      } catch {
+        }, null, 2) + '\n', { flag: 'wx' })
+      } catch (error) {
+        if (error?.code === 'EEXIST') markersSkipped += 1
         /* a read-only subdirectory simply gets no marker */
       }
     }
@@ -183,7 +210,9 @@ export async function walkTree(root, { maxDepth = 6, maxFiles = 20000, maxDirs =
     truncated,
     filesSeen,
     skippedDirectories,
-    markersWritten: markers,
+    markersWritten: markersEnabled,
+    markersSkipped,
+    markerRejected,
     extensions: Object.fromEntries([...extensions.entries()]),
   }
   map.sniffed = await sniffUnknowns(map, { budget: 400 })
@@ -679,6 +708,14 @@ const POLICY = {
 
 export async function adoptProject(workspace, { root, mode = 'light', markers = false, apply = false, maxFiles = 20000, maxDepth = 6, markerName = '.dsh-map.json' } = {}) {
   const target = resolve(root ?? workspace)
+  const zone = resolve(workspace)
+  if (target !== zone && !target.startsWith(zone.endsWith(sep) ? zone : `${zone}${sep}`)) {
+    return {
+      ok: false,
+      error: `root ${target} is outside the workspace ${zone}: adoption only ever writes inside the project you work in`,
+      target,
+    }
+  }
   const map = await walkTree(target, { markers, maxFiles, maxDepth, markerName })
   const summary = summarizeMap(map)
   const facts = await extractFacts(target, map)
@@ -731,8 +768,11 @@ export async function adoptProject(workspace, { root, mode = 'light', markers = 
       for (const example of examples) index.push(`- \`${example}\``)
       index.push('')
     }
-    if (await attempt(result.skipped, 'literature/_INDEX.md', () => writeFile(join(target, 'literature', '_INDEX.md'), index.join('\n')))) {
-      result.created.push('literature/_INDEX.md')
+    if (await attempt(result.skipped, 'literature/_INDEX.md', async () => {
+      const state = await ensureFile(join(target, 'literature', '_INDEX.md'), index.join('\n') + '\n')
+      result[state === 'created' ? 'created' : 'kept'].push('literature/_INDEX.md')
+    }) === false) {
+      /* a read-only literature directory keeps no index, and the report says so */
     }
   }
   result.mapText = renderMap(map, summary)
@@ -824,6 +864,7 @@ export function apply(ctx, config) {
         maxFiles: typeof args?.max_files === 'number' ? args.max_files : 20000,
         maxDepth: typeof args?.max_depth === 'number' ? args.max_depth : 6,
       })
+      if (result.ok === false) return { ok: false, error: result.error, target: result.target, text: `project_adopt: отказано — ${result.error}` }
       const lines = []
       lines.push(`Проект: ${result.target}`)
       lines.push(`Каталогов ${result.summary.directories} · файлов ${result.summary.files}` +

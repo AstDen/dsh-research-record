@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { STACK, AVOID, GAPS, allPackages, installCommand, packageName, renderStack } from './stack.js'
+import { makeCtx } from './fixtures/ctx.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 let passed = 0
@@ -102,11 +103,14 @@ check('install command targets a profile', installCommand(corePackages, 'web').s
 
 // apply() with a fake context: capture what the bundle registers, spawn nothing
 const registered = { tools: [], commands: [], sections: [] }
-const fake = {
-  tools: { register: (definition) => registered.tools.push(definition) },
-  commands: { register: (definition) => registered.commands.push(definition) },
-  systemPrompt: { section: (section) => registered.sections.push(section) },
-}
+const fake = makeCtx(
+  {
+    tools: { register: (definition) => registered.tools.push(definition) },
+    commands: { register: (definition) => registered.commands.push(definition) },
+    systemPrompt: { section: (section) => registered.sections.push(section) },
+  },
+  { inject: ['tools', 'commands', 'systemPrompt'], label: 'smoke-stack' },
+)
 await apply(fake, {})
 const tool = registered.tools.find((definition) => definition.name === 'research_stack')
 check('the bundle registers research_stack', tool !== undefined)

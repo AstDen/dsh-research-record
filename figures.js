@@ -40,9 +40,13 @@ function mmToPt(mm) {
  * column, two panels take both columns and keep the 50 mm data height with the
  * legend inside the panel, three panels add the footer-legend band below.
  */
-export function planLayout({ panels, arrangement = 'row', widthMm = 190, extraLegendMm = 8, colHeightMm = 55 }) {
+export function planLayout({ panels, arrangement = 'row', widthMm, extraLegendMm = 8, colHeightMm = 55 }) {
   if (!Number.isInteger(panels) || panels < 1) throw new Error('panels must be a positive integer')
-  if (!GEOMETRY.widthsMm.includes(widthMm)) {
+  // A single panel goes into the 90 mm column unless the caller insists: asking
+  // for two columns to hold one 90 mm panel is how the sheet grew to 190 mm and
+  // stopped matching the documented contract.
+  const width = widthMm === undefined ? (panels === 1 ? 90 : 190) : widthMm
+  if (!GEOMETRY.widthsMm.includes(width)) {
     throw new Error(`widthMm must be one of ${GEOMETRY.widthsMm.join(', ')} — the journal prints 90 mm (one column) or 190 mm (two columns)`)
   }
 
@@ -64,11 +68,11 @@ export function planLayout({ panels, arrangement = 'row', widthMm = 190, extraLe
   }
 
   const letters = panels >= 2
-  const legend = panels === 1 ? 'to the right of the panel, outside the data area'
+  const legend = panels === 1 ? 'INSIDE the panel, in the corner with the fewest data points (auto_legend)'
     : panels === 2 ? 'INSIDE the panel, in the corner with the fewest data points (auto_legend)'
       : 'below the panels, in the reserved band (measure it, do not guess)'
 
-  return { nrows, ncols, widthMm, heightMm, legend, letters }
+  return { nrows, ncols, widthMm: width, heightMm, legend, letters }
 }
 
 function renderPlan(plan, language = 'ru') {
@@ -122,7 +126,7 @@ export function apply(ctx) {
       const plan = planLayout({
         panels: args.panels,
         arrangement: args.arrangement ?? 'row',
-        widthMm: args.width_mm ?? 190,
+        widthMm: args.width_mm,
       })
       return renderPlan(plan, args.language ?? 'ru')
     },

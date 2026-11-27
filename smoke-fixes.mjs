@@ -14,6 +14,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { makeCtx } from './fixtures/ctx.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const notebook = await import(join(resolve(here), 'notebook.js'))
@@ -27,12 +28,11 @@ const check = (label, ok, detail = '') => {
 
 /** A host with sessions, tools, one prompt section, and an event bus. */
 function makeHost(headers) {
-  const handlers = new Map()
+  let handlers = new Map()
   const tools = new Map()
   const sections = []
-  const ctx = {
+  const services = {
     sessions: { get: (id) => (headers[id] === undefined ? undefined : { header: headers[id] }) },
-    get: (name) => (name === 'sessions' ? ctx.sessions : undefined),
     tools: {
       register(definition) {
         tools.set(definition.name, definition)
@@ -45,14 +45,9 @@ function makeHost(headers) {
         return () => undefined
       },
     },
-    on(event, handler) {
-      const list = handlers.get(event) ?? []
-      list.push(handler)
-      handlers.set(event, list)
-      return () => undefined
-    },
-    inject() {},
   }
+  const ctx = makeCtx(services, { inject: ['tools', 'systemPrompt'], label: 'smoke-fixes' })
+  handlers = ctx.__handlers
   return {
     ctx,
     tools,

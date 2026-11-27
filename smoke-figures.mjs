@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { GEOMETRY, apply, planLayout } from './figures.js'
+import { makeCtx } from './fixtures/ctx.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 let failures = 0
@@ -28,22 +29,29 @@ function check(label, condition, detail) {
 
 function fakeCtx() {
   const tools = new Map()
-  return {
-    tools: {
-      register(definition) {
-        if (tools.has(definition.name)) throw new Error(`duplicate tool ${definition.name}`)
-        tools.set(definition.name, definition)
+  const ctx = makeCtx(
+    {
+      tools: {
+        register(definition) {
+          if (tools.has(definition.name)) throw new Error(`duplicate tool ${definition.name}`)
+          tools.set(definition.name, definition)
+          return () => tools.delete(definition.name)
+        },
       },
     },
-    get toolsMap() { return tools },
-  }
+    { inject: ['tools'], label: 'smoke-figures' },
+  )
+  ctx.toolsMap = tools
+  return ctx
 }
 
 // ── geometry (JS side) ─────────────────────────────────────────────────────
 const one = planLayout({ panels: 1, widthMm: 90 })
+const oneDefault = planLayout({ panels: 1 })
 check('one panel is 90 x 50 mm', one.widthMm === 90 && one.heightMm === 50)
 check('one panel gets no letters', one.letters === false)
-check('one panel legend goes to the right', /right/.test(one.legend))
+check('one panel defaults to the 90 mm column', oneDefault.widthMm === 90)
+check('one panel keeps the legend inside the panel', /INSIDE/.test(one.legend))
 
 const two = planLayout({ panels: 2 })
 check('two panels are 190 x 50 mm rigidly', two.widthMm === 190 && two.heightMm === 50)

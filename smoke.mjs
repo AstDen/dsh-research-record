@@ -17,6 +17,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 
+import { makeCtx } from './fixtures/ctx.mjs'
+
 const here = dirname(fileURLToPath(import.meta.url))
 const guardModule = await import(join(resolve(here), 'guard.js'))
 const notebookModule = await import(join(resolve(here), 'notebook.js'))
@@ -34,16 +36,18 @@ function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
 }
 
-/** A host stand-in: services only, no UI, no web server. */
+/**
+ * A host stand-in: services only, no UI, no web server.
+ *
+ * The context is a cordis-faithful fixture (`fixtures/ctx.mjs`): `workingDirectory`
+ * and `sessions` are services this bundle does not inject, so the plugins may only
+ * reach them through `ctx.get(name)` — exactly as in the real host.
+ */
 function makeHost(cwd, sessionId) {
   const tools = new Map()
   const sections = []
-  const handlers = new Map()
-  const ctx = {
+  const services = {
     sessions: { get: (id) => (id === sessionId ? { header: { id, cwd } } : undefined) },
-    get(name) {
-      return name === 'sessions' ? ctx.sessions : undefined
-    },
     tools: {
       register(definition) {
         if (tools.has(definition.name)) throw new Error(`duplicate tool registration: ${definition.name}`)
@@ -57,17 +61,9 @@ function makeHost(cwd, sessionId) {
         return () => undefined
       },
     },
-    on(event, handler) {
-      const list = handlers.get(event) ?? []
-      list.push(handler)
-      handlers.set(event, list)
-      return () => undefined
-    },
-    inject() {
-      /* no webServer in the fake host */
-    },
   }
-  return { ctx, tools, sections, handlers }
+  const ctx = makeCtx(services, { inject: ['tools', 'systemPrompt'], label: 'smoke' })
+  return { ctx, tools, sections, handlers: ctx.__handlers }
 }
 
 const workspace = await mkdtemp(join(tmpdir(), 'research-record-smoke-'))
