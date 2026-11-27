@@ -239,6 +239,16 @@ async function sha256(text) {
   const derived = await decide('data/derived/clean.csv')
   const raw = await decide('data/raw/original.csv')
   check('M2', 'the scaffold policy allows data/derived and still refuses data/raw', derived === 'allow' && raw === 'deny', `derived=${derived} raw=${raw}`)
+  const status = await host.call('policy_status', {})
+  check(
+    'M2',
+    'policy_status reports the exemptions it granted',
+    Array.isArray(status.allowPaths) && status.allowPaths.some((entry) => String(entry).includes('derived')),
+    `allowPaths=${JSON.stringify(status.allowPaths)}`,
+  )
+  const rendered = host.tools.map.get('policy_status').output.render({}, status)
+  const statusText = rendered.map((block) => block.text ?? '').join('\n')
+  check('M2', 'policy_status prints the exemptions', /^allowed:\s+.*derived/m.test(statusText), statusText.split('\n').slice(0, 7).join(' | '))
 }
 
 // ── M3: max_files must actually stop the walk ─────────────────────────────
