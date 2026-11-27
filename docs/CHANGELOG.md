@@ -118,6 +118,14 @@ The full report is `dsh-research-record-audit/report.md`, the plan is
   `PROJECT.md (вопрос)`, and keeps `<form>.bak-<timestamp>` before a forced
   rewrite.
 
+### Acceptance, measured on the restarted host
+
+A page reload does not load a new host build — the loader reads plugins once — so
+the live check needed the process restarted. After it: `policy_status` reports the
+session project instead of the home directory, `notebook` writes to
+`<project>/.dsh/notebook/` and says `workspace from workingDirectory`, and
+`/notebook?workspace=/tmp` answers 403 where 0.8.1 answered 200.
+
 ### Small
 
 - The search tokenizer no longer drops CJK text, and `limit: "5"` is read as five

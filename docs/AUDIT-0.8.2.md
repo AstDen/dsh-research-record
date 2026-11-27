@@ -14,12 +14,13 @@ sibling directory `dsh-research-record-audit/report.md` (not shipped).
 | 2. suites | `npm test` (8 suites + cordis + regress) | exit 0, 0 failures |
 | 3. acceptance | `node ../dsh-research-record-audit/verify-fixes.mjs` | 23/23 findings `FIXED` |
 | 4. legacy data | `node ../dsh-research-record-audit/check-legacy-journal.mjs` | 5/5 journals written by 0.8.1 verify unchanged |
-| 5. live host | second instance (`--port 3099 --no-open`) | `/notebook?workspace=/etc` → **403**, own workspace → 200 |
+| 5. live host | restart, then the tools in a project session | `/notebook?workspace=/tmp` → **403**, journals land in the project, `policy_status` reports the project |
 | 6. load | not met — see "Deferred" below | — |
+| 7. live instance | second instance (`--port 3099 --no-open`) | `/notebook?workspace=/etc` → **403**, own workspace → 200 |
 
 The numbers before and after: the regression suite started as **3/14** (the
 three that passed were the ones whose fixtures did not reach the defect) and now
-holds **36/36**. `smoke-figures` went 31 → 32 assertions, the rest stayed.
+holds **38/38**. `smoke-figures` went 31 → 32 assertions, the rest stayed.
 
 Why the old suites were green: they ran on a flat fake context whose services
 were plain properties, so `ctx.workingDirectory ?? ctx.get('workingDirectory')`
@@ -72,14 +73,24 @@ cordis does; `smoke-cordis.mjs` proves the same claim on the real
   `supersede.jsonl` is skipped only in the `catch` path of the telemetry walk;
   an absolute path outside the workspace is hashed by artifact recording.
 
-## Not verifiable without a restart
+## Verified on the restarted host
 
 The `link:` install means the profile points at this checkout, so 0.8.2 loads on
-the next start. The main process of this session still runs the 0.8.1 build, and
-the loader has no file watcher: criterion "live host" (`policy_status` and
-`notebook` in the project, `ls ~/.dsh/notebook` unchanged) becomes checkable
-after a DSH restart. What could be checked without it was checked on a second
-instance of the same profile, which does run 0.8.2:
+the next start — a page reload does not, because the loader has no file watcher
+and the host process reads its plugins once. After the restart:
+
+| Check | Result |
+| --- | --- |
+| `policy_status` | `workspace:` is the session project, not the home directory |
+| `notebook` | writes to `<project>/.dsh/notebook/…` and says `workspace from workingDirectory` |
+| `~/.dsh/notebook` | no new file appeared |
+| `/notebook?workspace=/tmp`, `/provenance?workspace=/etc` | **403** |
+| `/notebook` (own workspace) | 200 |
+
+Before the restart the same profile still answered 200 to `/notebook?workspace=/tmp`
+and put new records under `~/.dsh/notebook`, which is the 0.8.1 behaviour.
+
+## Second instance (kept as a cheap pre-restart check)
 
 ```bash
 dsh --profile web --port 3099 --no-open
